@@ -1,0 +1,97 @@
+2026-04-29 16:28:33,051 [INFO] src.processing.pdf_parser: OCR fallback for data\2 Cell and Tristar report.pdf
+2026-04-29 16:28:42,131 [ERROR] __main__: Failed to process 2 Cell and Tristar report.pdf: 1 validation error for ClaimRecord
+ocr_confidence
+  Input should be less than or equal to 1 [type=less_than_equal, input_value=55.00303951367781, input_type=float]
+    For further information visit https://errors.pydantic.dev/2.13/v/less_than_equal
+Traceback (most recent call last):
+  File "C:\Users\Asus\Documents\GitHub\Motor_claims_training\src\cli.py", line 54, in main
+    record = ClaimRecord(
+        file_name=p.name,
+    ...<8 lines>...
+        fraud_flags=fraud["flags"],
+    )
+  File "C:\Users\Asus\Documents\GitHub\Motor_claims_training\venv\Lib\site-packages\pydantic\main.py", line 263, in __init__
+    validated_self = self.__pydantic_validator__.validate_python(data, self_instance=self)
+pydantic_core._pydantic_core.ValidationError: 1 validation error for ClaimRecord
+ocr_confidence
+  Input should be less than or equal to 1 [type=less_than_equal, input_value=55.00303951367781, input_type=float]
+    For further information visit https://errors.pydantic.dev/2.13/v/less_than_equal
+2026-04-29 16:28:42,168 [INFO] src.processing.pdf_parser: OCR fallback for data\A F LOPES ASSESEMENT REPORT.pdf
+2026-04-29 16:28:51,253 [ERROR] __main__: Failed to process A F LOPES ASSESEMENT REPORT.pdf: 1 validation error for ClaimRecord
+ocr_confidence
+  Input should be less than or equal to 1 [type=less_than_equal, input_value=75.29152542372881, input_type=float]
+    For further information visit https://errors.pydantic.dev/2.13/v/less_than_equal
+Traceback (most recent call last):
+  File "C:\Users\Asus\Documents\GitHub\Motor_claims_training\src\cli.py", line 54, in main
+    record = ClaimRecord(
+        file_name=p.name,
+    ...<8 lines>...
+        fraud_flags=fraud["flags"],
+    )
+  File "C:\Users\Asus\Documents\GitHub\Motor_claims_training\venv\Lib\site-packages\pydantic\main.py", line 263, in __init__
+    validated_self = self.__pydantic_validator__.validate_python(data, self_instance=self)
+pydantic_core._pydantic_core.ValidationError: 1 validation error for ClaimRecord
+ocr_confidence
+  Input should be less than or equal to 1 [type=less_than_equal, input_value=75.29152542372881, input_type=float]
+    For further information visit https://errors.pydantic.dev/2.13/v/less_than_equal
+2026-04-29 16:28:51,265 [INFO] src.processing.pdf_parser: OCR fallback for data\A Rugara assessment report.pdf
+2026-04-29 16:29:05,488 [ERROR] __main__: Failed to process A Rugara assessment report.pdf: 1 validation error for ClaimRecord
+ocr_confidence
+  Input should be less than or equal to 1 [type=less_than_equal, input_value=63.6933867735471, input_type=float]
+    For further information visit https://errors.pydantic.dev/2.13/v/less_than_equal
+Traceback (most recent call last):
+  File "C:\Users\Asus\Documents\GitHub\Motor_claims_training\src\cli.py", line 54, in main
+    record = ClaimRecord(
+        file_name=p.name,
+    ...<8 lines>...
+        fraud_flags=fraud["flags"],
+    )
+  File "C:\Users\Asus\Documents\GitHub\Motor_claims_training\venv\Lib\site-packages\pydantic\main.py", line 263, in __init__
+    validated_self = self.__pydantic_validator__.validate_python(data, self_instance=self)
+pydantic_core._pydantic_core.ValidationError: 1 validation error for ClaimRecord
+ocr_confidence
+  Input should be less than or equal to 1 [type=less_than_equal, input_value=63.6933867735471, input_type=float]
+    For further information visit https://errors.pydantic.dev/2.13/v/less_than_equal
+2026-04-29 16:29:05,662 [INFO] src.processing.pdf_parser: OCR fallback for data\A.W PATSON ASSESEMENT REPORT.pdf
+2026-04-29 16:29:17,187 [ERROR] __main__: Failed to process A.W PATSON ASSESEMENT REPORT.pdf: 1 validation error for ClaimRecord
+ocr_confidence
+  Input should be less than or equal to 1 [type=less_than_equal, input_value=67.30201342281879, input_type=float]
+    For further information visit https://errors.pydantic.dev/2.13/v/less_than_equal
+Traceback (most recent call last):
+  File "C:\Users\Asus\Documents\GitHub\Motor_claims_training\src\cli.py", line 54, in main
+    record = ClaimRecord(
+        file_name=p.name,
+    ...<8 lines>...
+        fraud_flags=fraud["flags"],
+    )
+  File "C:\Users\Asus\Documents\GitHub\Motor_claims_training\venv\Lib\site-packages\pydantic\main.py", line 263, in __init__
+    validated_self = self.__pydantic_validator__.validate_python(data, self_instance=self)
+pydantic_core._pydantic_core.ValidationError: 1 validation error for ClaimRecord
+ocr_confidence
+  Input should be less than or equal to 1 [type=less_than_equal, input_value=67.30201342281879, input_type=float]
+    For further information visit https://errors.pydantic.dev/2.13/v/less_than_equal
+2026-04-29 16:29:17,198 [INFO] src.processing.pdf_parser: OCR fallback for data\AA Zimbabwe techical report.pdf
+2026-04-29 16:29:34,787 [ERROR] __main__: Failed to process AA Zimbabwe techical report.pdf: 1 validation error for ClaimRecord
+ocr_confidence
+  Input should be less than or equal to 1 [type=less_than_equal, input_value=69.55944055944056, input_type=float]
+    For further information visit https://errors.pydantic.dev/2.13/v/less_than_equal
+Traceback (most recent call last):
+  File "C:\Users\Asus\Documents\GitHub\Motor_claims_training\src\cli.py", line 54, in main
+    record = ClaimRecord(
+        file_name=p.name,
+    ...<8 lines>...
+        fraud_flags=fraud["flags"],
+    )
+  File "C:\Users\Asus\Documents\GitHub\Motor_claims_training\venv\Lib\site-packages\pydantic\main.py", line 263, in __init__
+    validated_self = self.__pydantic_validator__.validate_python(data, self_instance=self)
+pydantic_core._pydantic_core.ValidationError: 1 validation error for ClaimRecord
+ocr_confidence
+  Input should be less than or equal to 1 [type=less_than_equal, input_value=69.55944055944056, input_type=float]
+    For further information visit https://errors.pydantic.dev/2.13/v/less_than_equal
+2026-04-29 16:29:35,039 [INFO] __main__: Done. 5 records exported to output
+2026-04-29 16:33:16,978 [INFO] src.processing.pdf_parser: OCR fallback for data\2 Cell and Tristar report.pdf
+2026-04-29 16:33:24,931 [INFO] src.processing.pdf_parser: OCR fallback for data\A F LOPES ASSESEMENT REPORT.pdf
+2026-04-29 16:33:33,903 [INFO] src.processing.pdf_parser: OCR fallback for data\A Rugara assessment report.pdf
+2026-04-29 16:33:48,488 [INFO] src.processing.pdf_parser: OCR fallback for data\A.W PATSON ASSESEMENT REPORT.pdf
+2026-04-29 16:34:00,453 [INFO] src.processing.pdf_parser: OCR fallback for data\AA Zimbabwe techical report.pdf
+2026-04-29 16:34:18,503 [INFO] __main__: Done. 10 records exported to output
