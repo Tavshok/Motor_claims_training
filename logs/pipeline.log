@@ -95,3 +95,178 @@ ocr_confidence
 2026-04-29 16:33:48,488 [INFO] src.processing.pdf_parser: OCR fallback for data\A.W PATSON ASSESEMENT REPORT.pdf
 2026-04-29 16:34:00,453 [INFO] src.processing.pdf_parser: OCR fallback for data\AA Zimbabwe techical report.pdf
 2026-04-29 16:34:18,503 [INFO] __main__: Done. 10 records exported to output
+2026-04-29 17:26:24,550 [INFO] __main__: Components found in 117597 MOOVAH ASSESSORS REPORT FORM (3) - 2019-12-19T144830.681.pdf: ['Bonnet', 'Radiator', 'Engine', 'Gearbox', 'Steering Wheel']
+2026-04-29 17:26:24,684 [INFO] __main__: Components found in 1713159177145_ZANDIWE TSHUMA MERCEDES BENZ A CLASS AFO 6011 ASSESSMENT REPORT.pdf: ['Radiator', 'Engine', 'Gearbox', 'Exhaust']
+2026-04-29 17:26:24,842 [INFO] __main__: Components found in 1737028565991_ZPC TOYOTA HILUX AFX 0857 ASSESSMENT REPORT.pdf: ['Radiator']
+2026-04-29 17:26:24,845 [INFO] src.processing.pdf_parser: OCR fallback for data\2 Cell and Tristar report.pdf
+2026-04-29 17:26:33,261 [INFO] __main__: Components found in 2 Cell and Tristar report.pdf: ['Rear Bumper', 'Radiator', 'Engine']
+2026-04-29 17:26:33,265 [INFO] src.processing.pdf_parser: OCR fallback for data\A F LOPES ASSESEMENT REPORT.pdf
+2026-04-29 17:26:42,790 [INFO] __main__: Components found in A F LOPES ASSESEMENT REPORT.pdf: ['Radiator', 'Engine']
+2026-04-29 17:26:42,794 [INFO] src.processing.pdf_parser: OCR fallback for data\A Rugara assessment report.pdf
+2026-04-29 17:26:58,548 [INFO] __main__: Components found in A Rugara assessment report.pdf: ['Rear Bumper', 'Engine', 'Exhaust']
+2026-04-29 17:26:58,701 [INFO] __main__: Components found in A. Mutuma Ford Ranger ADL3505 Assesement report.pdf: ['Front Bumper', 'Bonnet', 'Boot Lid', 'Grille', 'Radiator']
+2026-04-29 17:26:58,704 [INFO] src.processing.pdf_parser: OCR fallback for data\A.W PATSON ASSESEMENT REPORT.pdf
+2026-04-29 17:27:11,059 [INFO] __main__: Components found in A.W PATSON ASSESEMENT REPORT.pdf: ['Windscreen', 'Engine', 'Exhaust']
+2026-04-29 17:27:11,063 [INFO] src.processing.pdf_parser: OCR fallback for data\AA Zimbabwe techical report.pdf
+2026-04-29 17:27:29,556 [INFO] __main__: Components found in AA Zimbabwe techical report.pdf: ['Front Bumper', 'Bonnet', 'Boot Lid', 'Grille', 'Windscreen', 'Rear Window', 'Radiator', 'Engine', 'Gearbox', 'Exhaust', 'Steering Rack', 'Tie Rod End', 'Wheel Bearing', 'Steering Wheel']
+2026-04-29 17:27:29,775 [INFO] __main__: Components found in Aaron Garikari  Mazda Familia  ABK6794 Assesement report.pdf: ['Bonnet', 'Radiator', 'Engine', 'Gearbox', 'Steering Wheel']
+2026-04-29 17:27:29,784 [INFO] __main__: Done. 10 records exported to output
+2026-04-29 17:32:26,321 [INFO] __main__: Components found in 117597 MOOVAH ASSESSORS REPORT FORM (3) - 2019-12-19T144830.681.pdf: ['Bonnet', 'Radiator', 'Engine', 'Gearbox', 'Steering Wheel']
+2026-04-29 17:32:26,336 [INFO] __main__: Extracted 0 images from 117597 MOOVAH ASSESSORS REPORT FORM (3) - 2019-12-19T144830.681.pdf
+2026-04-29 17:32:26,465 [INFO] __main__: Components found in 1713159177145_ZANDIWE TSHUMA MERCEDES BENZ A CLASS AFO 6011 ASSESSMENT REPORT.pdf: ['Radiator', 'Engine', 'Gearbox', 'Exhaust']
+2026-04-29 17:32:26,472 [INFO] __main__: Extracted 7 images from 1713159177145_ZANDIWE TSHUMA MERCEDES BENZ A CLASS AFO 6011 ASSESSMENT REPORT.pdf
+2026-04-29 17:32:26,628 [INFO] __main__: Components found in 1737028565991_ZPC TOYOTA HILUX AFX 0857 ASSESSMENT REPORT.pdf: ['Radiator']
+2026-04-29 17:32:26,655 [INFO] __main__: Extracted 12 images from 1737028565991_ZPC TOYOTA HILUX AFX 0857 ASSESSMENT REPORT.pdf
+2026-04-29 17:32:26,657 [INFO] src.processing.pdf_parser: OCR fallback for data\2 Cell and Tristar report.pdf
+2026-04-29 17:32:34,907 [INFO] __main__: Components found in 2 Cell and Tristar report.pdf: ['Rear Bumper', 'Radiator', 'Engine']
+2026-04-29 17:32:34,909 [INFO] __main__: Extracted 0 images from 2 Cell and Tristar report.pdf
+2026-04-29 17:32:34,911 [INFO] src.processing.pdf_parser: OCR fallback for data\A F LOPES ASSESEMENT REPORT.pdf
+2026-04-29 17:32:44,044 [INFO] __main__: Components found in A F LOPES ASSESEMENT REPORT.pdf: ['Radiator', 'Engine']
+2026-04-29 17:32:44,046 [INFO] __main__: Extracted 0 images from A F LOPES ASSESEMENT REPORT.pdf
+2026-04-29 17:32:44,049 [INFO] src.processing.pdf_parser: OCR fallback for data\A Rugara assessment report.pdf
+2026-04-29 17:32:58,471 [INFO] __main__: Components found in A Rugara assessment report.pdf: ['Rear Bumper', 'Engine', 'Exhaust']
+2026-04-29 17:32:58,474 [INFO] __main__: Extracted 0 images from A Rugara assessment report.pdf
+2026-04-29 17:32:58,625 [INFO] __main__: Components found in A. Mutuma Ford Ranger ADL3505 Assesement report.pdf: ['Front Bumper', 'Bonnet', 'Boot Lid', 'Grille', 'Radiator']
+2026-04-29 17:32:58,652 [INFO] __main__: Extracted 12 images from A. Mutuma Ford Ranger ADL3505 Assesement report.pdf
+2026-04-29 17:32:58,654 [INFO] src.processing.pdf_parser: OCR fallback for data\A.W PATSON ASSESEMENT REPORT.pdf
+2026-04-29 17:33:10,141 [INFO] __main__: Components found in A.W PATSON ASSESEMENT REPORT.pdf: ['Windscreen', 'Engine', 'Exhaust']
+2026-04-29 17:33:10,143 [INFO] __main__: Extracted 0 images from A.W PATSON ASSESEMENT REPORT.pdf
+2026-04-29 17:33:10,146 [INFO] src.processing.pdf_parser: OCR fallback for data\AA Zimbabwe techical report.pdf
+2026-04-29 17:33:27,996 [INFO] __main__: Components found in AA Zimbabwe techical report.pdf: ['Front Bumper', 'Bonnet', 'Boot Lid', 'Grille', 'Windscreen', 'Rear Window', 'Radiator', 'Engine', 'Gearbox', 'Exhaust', 'Steering Rack', 'Tie Rod End', 'Wheel Bearing', 'Steering Wheel']
+2026-04-29 17:33:27,999 [INFO] __main__: Extracted 0 images from AA Zimbabwe techical report.pdf
+2026-04-29 17:33:28,222 [INFO] __main__: Components found in Aaron Garikari  Mazda Familia  ABK6794 Assesement report.pdf: ['Bonnet', 'Radiator', 'Engine', 'Gearbox', 'Steering Wheel']
+2026-04-29 17:33:28,231 [INFO] __main__: Extracted 0 images from Aaron Garikari  Mazda Familia  ABK6794 Assesement report.pdf
+2026-04-29 17:33:28,239 [INFO] __main__: Done. 10 records exported to output
+2026-04-29 17:50:18,234 [INFO] __main__: Components in 117597 MOOVAH ASSESSORS REPORT FORM (3) - 2019-12-19T144830.681.pdf: ['Bonnet', 'Radiator', 'Engine', 'Gearbox', 'Steering Wheel']
+2026-04-29 17:50:18,699 [INFO] __main__: Extracted 4 images from 117597 MOOVAH ASSESSORS REPORT FORM (3) - 2019-12-19T144830.681.pdf
+2026-04-29 17:50:19,360 [INFO] httpx: HTTP Request: HEAD https://huggingface.co/google/owlvit-base-patch32/resolve/main/config.json "HTTP/1.1 307 Temporary Redirect"
+2026-04-29 17:50:19,388 [INFO] httpx: HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/google/owlvit-base-patch32/cbc355fb364588351c5d51c7f74465e8e7ec6f72/config.json "HTTP/1.1 200 OK"
+2026-04-29 17:50:19,434 [INFO] httpx: HTTP Request: GET https://huggingface.co/api/resolve-cache/models/google/owlvit-base-patch32/cbc355fb364588351c5d51c7f74465e8e7ec6f72/config.json "HTTP/1.1 200 OK"
+2026-04-29 17:50:19,794 [INFO] httpx: HTTP Request: HEAD https://huggingface.co/google/owlvit-base-patch32/resolve/main/model.safetensors "HTTP/1.1 302 Found"
+2026-04-29 17:50:20,119 [INFO] httpx: HTTP Request: GET https://huggingface.co/api/models/google/owlvit-base-patch32/xet-read-token/cbc355fb364588351c5d51c7f74465e8e7ec6f72 "HTTP/1.1 200 OK"
+2026-04-29 17:55:17,125 [INFO] httpx: HTTP Request: HEAD https://huggingface.co/google/owlvit-base-patch32/resolve/main/tokenizer_config.json "HTTP/1.1 307 Temporary Redirect"
+2026-04-29 17:55:17,164 [INFO] httpx: HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/google/owlvit-base-patch32/cbc355fb364588351c5d51c7f74465e8e7ec6f72/tokenizer_config.json "HTTP/1.1 200 OK"
+2026-04-29 17:55:17,203 [INFO] httpx: HTTP Request: GET https://huggingface.co/api/resolve-cache/models/google/owlvit-base-patch32/cbc355fb364588351c5d51c7f74465e8e7ec6f72/tokenizer_config.json "HTTP/1.1 200 OK"
+2026-04-29 17:55:17,513 [INFO] httpx: HTTP Request: GET https://huggingface.co/api/models/google/owlvit-base-patch32/tree/main/additional_chat_templates?recursive=false&expand=false "HTTP/1.1 404 Not Found"
+2026-04-29 17:55:17,805 [INFO] httpx: HTTP Request: GET https://huggingface.co/api/models/google/owlvit-base-patch32/tree/main?recursive=true&expand=false "HTTP/1.1 200 OK"
+2026-04-29 17:55:18,101 [INFO] httpx: HTTP Request: HEAD https://huggingface.co/google/owlvit-base-patch32/resolve/main/vocab.json "HTTP/1.1 307 Temporary Redirect"
+2026-04-29 17:55:18,138 [INFO] httpx: HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/google/owlvit-base-patch32/cbc355fb364588351c5d51c7f74465e8e7ec6f72/vocab.json "HTTP/1.1 200 OK"
+2026-04-29 17:55:18,179 [INFO] httpx: HTTP Request: GET https://huggingface.co/api/resolve-cache/models/google/owlvit-base-patch32/cbc355fb364588351c5d51c7f74465e8e7ec6f72/vocab.json "HTTP/1.1 200 OK"
+2026-04-29 17:55:18,587 [INFO] httpx: HTTP Request: HEAD https://huggingface.co/google/owlvit-base-patch32/resolve/main/merges.txt "HTTP/1.1 307 Temporary Redirect"
+2026-04-29 17:55:18,622 [INFO] httpx: HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/google/owlvit-base-patch32/cbc355fb364588351c5d51c7f74465e8e7ec6f72/merges.txt "HTTP/1.1 200 OK"
+2026-04-29 17:55:18,654 [INFO] httpx: HTTP Request: GET https://huggingface.co/api/resolve-cache/models/google/owlvit-base-patch32/cbc355fb364588351c5d51c7f74465e8e7ec6f72/merges.txt "HTTP/1.1 200 OK"
+2026-04-29 17:55:18,963 [INFO] httpx: HTTP Request: HEAD https://huggingface.co/google/owlvit-base-patch32/resolve/main/tokenizer.json "HTTP/1.1 404 Not Found"
+2026-04-29 17:55:18,963 [WARNING] huggingface_hub.utils._http: Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+2026-04-29 17:55:19,259 [INFO] httpx: HTTP Request: HEAD https://huggingface.co/google/owlvit-base-patch32/resolve/main/added_tokens.json "HTTP/1.1 404 Not Found"
+2026-04-29 17:55:19,564 [INFO] httpx: HTTP Request: HEAD https://huggingface.co/google/owlvit-base-patch32/resolve/main/special_tokens_map.json "HTTP/1.1 307 Temporary Redirect"
+2026-04-29 17:55:19,603 [INFO] httpx: HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/google/owlvit-base-patch32/cbc355fb364588351c5d51c7f74465e8e7ec6f72/special_tokens_map.json "HTTP/1.1 200 OK"
+2026-04-29 17:55:19,638 [INFO] httpx: HTTP Request: GET https://huggingface.co/api/resolve-cache/models/google/owlvit-base-patch32/cbc355fb364588351c5d51c7f74465e8e7ec6f72/special_tokens_map.json "HTTP/1.1 200 OK"
+2026-04-29 17:55:19,941 [INFO] httpx: HTTP Request: HEAD https://huggingface.co/google/owlvit-base-patch32/resolve/main/chat_template.jinja "HTTP/1.1 404 Not Found"
+2026-04-29 17:55:20,323 [INFO] httpx: HTTP Request: HEAD https://huggingface.co/google/owlvit-base-patch32/resolve/main/processor_config.json "HTTP/1.1 404 Not Found"
+2026-04-29 17:55:20,624 [INFO] httpx: HTTP Request: HEAD https://huggingface.co/google/owlvit-base-patch32/resolve/main/preprocessor_config.json "HTTP/1.1 307 Temporary Redirect"
+2026-04-29 17:55:20,664 [INFO] httpx: HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/google/owlvit-base-patch32/cbc355fb364588351c5d51c7f74465e8e7ec6f72/preprocessor_config.json "HTTP/1.1 200 OK"
+2026-04-29 17:55:20,704 [INFO] httpx: HTTP Request: GET https://huggingface.co/api/resolve-cache/models/google/owlvit-base-patch32/cbc355fb364588351c5d51c7f74465e8e7ec6f72/preprocessor_config.json "HTTP/1.1 200 OK"
+2026-04-29 17:55:21,029 [INFO] httpx: HTTP Request: HEAD https://huggingface.co/google/owlvit-base-patch32/resolve/main/processor_config.json "HTTP/1.1 404 Not Found"
+2026-04-29 17:55:21,333 [INFO] httpx: HTTP Request: HEAD https://huggingface.co/google/owlvit-base-patch32/resolve/main/preprocessor_config.json "HTTP/1.1 307 Temporary Redirect"
+2026-04-29 17:55:21,363 [INFO] httpx: HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/google/owlvit-base-patch32/cbc355fb364588351c5d51c7f74465e8e7ec6f72/preprocessor_config.json "HTTP/1.1 200 OK"
+2026-04-29 17:55:46,037 [INFO] __main__: Enriched 4 images with damage detections for 117597 MOOVAH ASSESSORS REPORT FORM (3) - 2019-12-19T144830.681.pdf
+2026-04-29 17:55:46,186 [INFO] __main__: Components in 1713159177145_ZANDIWE TSHUMA MERCEDES BENZ A CLASS AFO 6011 ASSESSMENT REPORT.pdf: ['Radiator', 'Engine', 'Gearbox', 'Exhaust']
+2026-04-29 17:55:46,203 [INFO] __main__: Extracted 7 images from 1713159177145_ZANDIWE TSHUMA MERCEDES BENZ A CLASS AFO 6011 ASSESSMENT REPORT.pdf
+2026-04-29 17:56:23,800 [INFO] __main__: Enriched 7 images with damage detections for 1713159177145_ZANDIWE TSHUMA MERCEDES BENZ A CLASS AFO 6011 ASSESSMENT REPORT.pdf
+2026-04-29 17:56:23,988 [INFO] __main__: Components in 1737028565991_ZPC TOYOTA HILUX AFX 0857 ASSESSMENT REPORT.pdf: ['Radiator']
+2026-04-29 17:56:24,003 [INFO] __main__: Extracted 12 images from 1737028565991_ZPC TOYOTA HILUX AFX 0857 ASSESSMENT REPORT.pdf
+2026-04-29 17:56:38,719 [INFO] __main__: Enriched 12 images with damage detections for 1737028565991_ZPC TOYOTA HILUX AFX 0857 ASSESSMENT REPORT.pdf
+2026-04-29 17:56:38,721 [INFO] src.processing.pdf_parser: OCR fallback for data\2 Cell and Tristar report.pdf
+2026-04-29 17:56:47,363 [INFO] __main__: Components in 2 Cell and Tristar report.pdf: ['Rear Bumper', 'Radiator', 'Engine']
+2026-04-29 17:56:47,620 [INFO] __main__: Extracted 3 images from 2 Cell and Tristar report.pdf
+2026-04-29 17:56:59,090 [INFO] __main__: Enriched 3 images with damage detections for 2 Cell and Tristar report.pdf
+2026-04-29 17:56:59,093 [INFO] src.processing.pdf_parser: OCR fallback for data\A F LOPES ASSESEMENT REPORT.pdf
+2026-04-29 17:57:08,776 [INFO] __main__: Components in A F LOPES ASSESEMENT REPORT.pdf: ['Radiator', 'Engine']
+2026-04-29 17:57:09,047 [INFO] __main__: Extracted 3 images from A F LOPES ASSESEMENT REPORT.pdf
+2026-04-29 17:57:16,261 [INFO] __main__: Enriched 3 images with damage detections for A F LOPES ASSESEMENT REPORT.pdf
+2026-04-29 17:57:16,264 [INFO] src.processing.pdf_parser: OCR fallback for data\A Rugara assessment report.pdf
+2026-04-29 17:57:31,636 [INFO] __main__: Components in A Rugara assessment report.pdf: ['Rear Bumper', 'Engine', 'Exhaust']
+2026-04-29 17:57:32,143 [INFO] __main__: Extracted 5 images from A Rugara assessment report.pdf
+2026-04-29 17:57:53,766 [INFO] __main__: Enriched 5 images with damage detections for A Rugara assessment report.pdf
+2026-04-29 17:57:54,009 [INFO] __main__: Components in A. Mutuma Ford Ranger ADL3505 Assesement report.pdf: ['Front Bumper', 'Bonnet', 'Boot Lid', 'Grille', 'Radiator']
+2026-04-29 17:57:54,027 [INFO] __main__: Extracted 12 images from A. Mutuma Ford Ranger ADL3505 Assesement report.pdf
+2026-04-29 17:59:21,027 [INFO] __main__: Enriched 12 images with damage detections for A. Mutuma Ford Ranger ADL3505 Assesement report.pdf
+2026-04-29 17:59:21,030 [INFO] src.processing.pdf_parser: OCR fallback for data\A.W PATSON ASSESEMENT REPORT.pdf
+2026-04-29 17:59:33,661 [INFO] __main__: Components in A.W PATSON ASSESEMENT REPORT.pdf: ['Windscreen', 'Engine', 'Exhaust']
+2026-04-29 17:59:33,997 [INFO] __main__: Extracted 4 images from A.W PATSON ASSESEMENT REPORT.pdf
+2026-04-29 17:59:50,677 [INFO] __main__: Enriched 4 images with damage detections for A.W PATSON ASSESEMENT REPORT.pdf
+2026-04-29 17:59:50,681 [INFO] src.processing.pdf_parser: OCR fallback for data\AA Zimbabwe techical report.pdf
+2026-04-29 18:00:09,087 [INFO] __main__: Components in AA Zimbabwe techical report.pdf: ['Front Bumper', 'Bonnet', 'Boot Lid', 'Grille', 'Windscreen', 'Rear Window', 'Radiator', 'Engine', 'Gearbox', 'Exhaust', 'Steering Rack', 'Tie Rod End', 'Wheel Bearing', 'Steering Wheel']
+2026-04-29 18:00:09,446 [INFO] __main__: Extracted 4 images from AA Zimbabwe techical report.pdf
+2026-04-29 18:01:28,183 [INFO] __main__: Enriched 4 images with damage detections for AA Zimbabwe techical report.pdf
+2026-04-29 18:01:28,505 [INFO] __main__: Components in Aaron Garikari  Mazda Familia  ABK6794 Assesement report.pdf: ['Bonnet', 'Radiator', 'Engine', 'Gearbox', 'Steering Wheel']
+2026-04-29 18:01:28,835 [INFO] __main__: Extracted 4 images from Aaron Garikari  Mazda Familia  ABK6794 Assesement report.pdf
+2026-04-29 18:01:57,192 [INFO] __main__: Enriched 4 images with damage detections for Aaron Garikari  Mazda Familia  ABK6794 Assesement report.pdf
+2026-04-29 18:01:57,203 [INFO] __main__: Done. 10 records exported to output
+2026-04-29 18:21:33,320 [INFO] __main__: Components in 117597 MOOVAH ASSESSORS REPORT FORM (3) - 2019-12-19T144830.681.pdf: ['Bonnet', 'Radiator', 'Engine', 'Gearbox', 'Steering Wheel']
+2026-04-29 18:21:33,322 [INFO] __main__: Vehicle in 117597 MOOVAH ASSESSORS REPORT FORM (3) - 2019-12-19T144830.681.pdf: {'make': None, 'model': None, 'year': None}
+2026-04-29 18:21:33,330 [INFO] __main__: No cost line items found in 117597 MOOVAH ASSESSORS REPORT FORM (3) - 2019-12-19T144830.681.pdf
+2026-04-29 18:21:33,668 [INFO] __main__: Extracted 4 images from 117597 MOOVAH ASSESSORS REPORT FORM (3) - 2019-12-19T144830.681.pdf
+2026-04-29 18:21:34,291 [INFO] httpx: HTTP Request: HEAD https://huggingface.co/google/owlvit-base-patch32/resolve/main/config.json "HTTP/1.1 307 Temporary Redirect"
+2026-04-29 18:21:34,333 [INFO] httpx: HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/google/owlvit-base-patch32/cbc355fb364588351c5d51c7f74465e8e7ec6f72/config.json "HTTP/1.1 200 OK"
+2026-04-29 18:21:34,810 [INFO] httpx: HTTP Request: GET https://huggingface.co/api/models/google/owlvit-base-patch32/tree/main/additional_chat_templates?recursive=false&expand=false "HTTP/1.1 404 Not Found"
+2026-04-29 18:21:35,115 [INFO] httpx: HTTP Request: GET https://huggingface.co/api/models/google/owlvit-base-patch32/tree/main?recursive=true&expand=false "HTTP/1.1 200 OK"
+2026-04-29 18:21:35,498 [INFO] httpx: HTTP Request: HEAD https://huggingface.co/google/owlvit-base-patch32/resolve/main/processor_config.json "HTTP/1.1 404 Not Found"
+2026-04-29 18:21:35,905 [INFO] httpx: HTTP Request: HEAD https://huggingface.co/google/owlvit-base-patch32/resolve/main/preprocessor_config.json "HTTP/1.1 307 Temporary Redirect"
+2026-04-29 18:21:35,906 [WARNING] huggingface_hub.utils._http: Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+2026-04-29 18:21:35,998 [INFO] httpx: HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/google/owlvit-base-patch32/cbc355fb364588351c5d51c7f74465e8e7ec6f72/preprocessor_config.json "HTTP/1.1 200 OK"
+2026-04-29 18:21:36,448 [INFO] httpx: HTTP Request: HEAD https://huggingface.co/google/owlvit-base-patch32/resolve/main/processor_config.json "HTTP/1.1 404 Not Found"
+2026-04-29 18:21:36,749 [INFO] httpx: HTTP Request: HEAD https://huggingface.co/google/owlvit-base-patch32/resolve/main/preprocessor_config.json "HTTP/1.1 307 Temporary Redirect"
+2026-04-29 18:21:36,785 [INFO] httpx: HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/google/owlvit-base-patch32/cbc355fb364588351c5d51c7f74465e8e7ec6f72/preprocessor_config.json "HTTP/1.1 200 OK"
+2026-04-29 18:22:01,654 [INFO] __main__: Full record ready for 117597 MOOVAH ASSESSORS REPORT FORM (3) - 2019-12-19T144830.681.pdf (components: 5, costs: 0, images: 4)
+2026-04-29 18:22:01,807 [INFO] __main__: Components in 1713159177145_ZANDIWE TSHUMA MERCEDES BENZ A CLASS AFO 6011 ASSESSMENT REPORT.pdf: ['Radiator', 'Engine', 'Gearbox', 'Exhaust']
+2026-04-29 18:22:01,808 [INFO] __main__: Vehicle in 1713159177145_ZANDIWE TSHUMA MERCEDES BENZ A CLASS AFO 6011 ASSESSMENT REPORT.pdf: {'make': 'Quote', 'model': 'READY', 'year': '2013'}
+2026-04-29 18:22:01,815 [INFO] __main__: Cost items found: 2
+2026-04-29 18:22:01,823 [INFO] __main__: Extracted 7 images from 1713159177145_ZANDIWE TSHUMA MERCEDES BENZ A CLASS AFO 6011 ASSESSMENT REPORT.pdf
+2026-04-29 18:22:44,944 [INFO] __main__: Full record ready for 1713159177145_ZANDIWE TSHUMA MERCEDES BENZ A CLASS AFO 6011 ASSESSMENT REPORT.pdf (components: 4, costs: 2, images: 7)
+2026-04-29 18:22:45,157 [INFO] __main__: Components in 1737028565991_ZPC TOYOTA HILUX AFX 0857 ASSESSMENT REPORT.pdf: ['Radiator']
+2026-04-29 18:22:45,157 [INFO] __main__: Vehicle in 1737028565991_ZPC TOYOTA HILUX AFX 0857 ASSESSMENT REPORT.pdf: {'make': 'Issued', 'model': 'JAN', 'year': '2013'}
+2026-04-29 18:22:45,182 [INFO] __main__: No cost line items found in 1737028565991_ZPC TOYOTA HILUX AFX 0857 ASSESSMENT REPORT.pdf
+2026-04-29 18:22:45,197 [INFO] __main__: Extracted 12 images from 1737028565991_ZPC TOYOTA HILUX AFX 0857 ASSESSMENT REPORT.pdf
+2026-04-29 18:23:04,656 [INFO] __main__: Full record ready for 1737028565991_ZPC TOYOTA HILUX AFX 0857 ASSESSMENT REPORT.pdf (components: 1, costs: 0, images: 12)
+2026-04-29 18:23:04,659 [INFO] src.processing.pdf_parser: OCR fallback for data\2 Cell and Tristar report.pdf
+2026-04-29 18:23:13,904 [INFO] __main__: Components in 2 Cell and Tristar report.pdf: ['Rear Bumper', 'Radiator', 'Engine']
+2026-04-29 18:23:13,905 [INFO] __main__: Vehicle in 2 Cell and Tristar report.pdf: {'make': None, 'model': None, 'year': None}
+2026-04-29 18:23:13,907 [INFO] __main__: No cost line items found in 2 Cell and Tristar report.pdf
+2026-04-29 18:23:14,264 [INFO] __main__: Extracted 3 images from 2 Cell and Tristar report.pdf
+2026-04-29 18:23:29,603 [INFO] __main__: Full record ready for 2 Cell and Tristar report.pdf (components: 3, costs: 0, images: 3)
+2026-04-29 18:23:29,607 [INFO] src.processing.pdf_parser: OCR fallback for data\A F LOPES ASSESEMENT REPORT.pdf
+2026-04-29 18:23:40,236 [INFO] __main__: Components in A F LOPES ASSESEMENT REPORT.pdf: ['Radiator', 'Engine']
+2026-04-29 18:23:40,237 [INFO] __main__: Vehicle in A F LOPES ASSESEMENT REPORT.pdf: {'make': None, 'model': None, 'year': None}
+2026-04-29 18:23:40,241 [INFO] __main__: Cost items found: 2
+2026-04-29 18:23:40,514 [INFO] __main__: Extracted 3 images from A F LOPES ASSESEMENT REPORT.pdf
+2026-04-29 18:23:50,421 [INFO] __main__: Full record ready for A F LOPES ASSESEMENT REPORT.pdf (components: 2, costs: 2, images: 3)
+2026-04-29 18:23:50,424 [INFO] src.processing.pdf_parser: OCR fallback for data\A Rugara assessment report.pdf
+2026-04-29 18:24:06,706 [INFO] __main__: Components in A Rugara assessment report.pdf: ['Rear Bumper', 'Engine', 'Exhaust']
+2026-04-29 18:24:06,707 [INFO] __main__: Vehicle in A Rugara assessment report.pdf: {'make': 'Invoice', 'model': 'TO', 'year': '2017'}
+2026-04-29 18:24:06,713 [INFO] __main__: No cost line items found in A Rugara assessment report.pdf
+2026-04-29 18:24:07,111 [INFO] __main__: Extracted 5 images from A Rugara assessment report.pdf
+2026-04-29 18:24:32,476 [INFO] __main__: Full record ready for A Rugara assessment report.pdf (components: 3, costs: 0, images: 5)
+2026-04-29 18:24:32,735 [INFO] __main__: Components in A. Mutuma Ford Ranger ADL3505 Assesement report.pdf: ['Front Bumper', 'Bonnet', 'Boot Lid', 'Grille', 'Radiator']
+2026-04-29 18:24:32,735 [INFO] __main__: Vehicle in A. Mutuma Ford Ranger ADL3505 Assesement report.pdf: {'make': 'Issued', 'model': 'JAN', 'year': '2013'}
+2026-04-29 18:24:32,764 [INFO] __main__: Cost items found: 2
+2026-04-29 18:24:32,782 [INFO] __main__: Extracted 12 images from A. Mutuma Ford Ranger ADL3505 Assesement report.pdf
+2026-04-29 18:26:12,151 [INFO] __main__: Full record ready for A. Mutuma Ford Ranger ADL3505 Assesement report.pdf (components: 5, costs: 2, images: 12)
+2026-04-29 18:26:12,154 [INFO] src.processing.pdf_parser: OCR fallback for data\A.W PATSON ASSESEMENT REPORT.pdf
+2026-04-29 18:26:25,198 [INFO] __main__: Components in A.W PATSON ASSESEMENT REPORT.pdf: ['Windscreen', 'Engine', 'Exhaust']
+2026-04-29 18:26:25,199 [INFO] __main__: Vehicle in A.W PATSON ASSESEMENT REPORT.pdf: {'make': None, 'model': None, 'year': None}
+2026-04-29 18:26:25,203 [INFO] __main__: No cost line items found in A.W PATSON ASSESEMENT REPORT.pdf
+2026-04-29 18:26:25,537 [INFO] __main__: Extracted 4 images from A.W PATSON ASSESEMENT REPORT.pdf
+2026-04-29 18:26:45,524 [INFO] __main__: Full record ready for A.W PATSON ASSESEMENT REPORT.pdf (components: 3, costs: 0, images: 4)
+2026-04-29 18:26:45,527 [INFO] src.processing.pdf_parser: OCR fallback for data\AA Zimbabwe techical report.pdf
+2026-04-29 18:27:04,627 [INFO] __main__: Components in AA Zimbabwe techical report.pdf: ['Front Bumper', 'Bonnet', 'Boot Lid', 'Grille', 'Windscreen', 'Rear Window', 'Radiator', 'Engine', 'Gearbox', 'Exhaust', 'Steering Rack', 'Tie Rod End', 'Wheel Bearing', 'Steering Wheel']
+2026-04-29 18:27:04,628 [INFO] __main__: Vehicle in AA Zimbabwe techical report.pdf: {'make': None, 'model': None, 'year': None}
+2026-04-29 18:27:04,648 [INFO] __main__: No cost line items found in AA Zimbabwe techical report.pdf
+2026-04-29 18:27:04,997 [INFO] __main__: Extracted 4 images from AA Zimbabwe techical report.pdf
+2026-04-29 18:28:39,723 [INFO] __main__: Full record ready for AA Zimbabwe techical report.pdf (components: 14, costs: 0, images: 4)
+2026-04-29 18:28:40,078 [INFO] __main__: Components in Aaron Garikari  Mazda Familia  ABK6794 Assesement report.pdf: ['Bonnet', 'Radiator', 'Engine', 'Gearbox', 'Steering Wheel']
+2026-04-29 18:28:40,078 [INFO] __main__: Vehicle in Aaron Garikari  Mazda Familia  ABK6794 Assesement report.pdf: {'make': None, 'model': None, 'year': None}
+2026-04-29 18:28:40,086 [INFO] __main__: No cost line items found in Aaron Garikari  Mazda Familia  ABK6794 Assesement report.pdf
+2026-04-29 18:28:40,424 [INFO] __main__: Extracted 4 images from Aaron Garikari  Mazda Familia  ABK6794 Assesement report.pdf
+2026-04-29 18:29:14,885 [INFO] __main__: Full record ready for Aaron Garikari  Mazda Familia  ABK6794 Assesement report.pdf (components: 5, costs: 0, images: 4)
+2026-04-29 18:29:14,898 [INFO] __main__: Done. 10 records exported to output
