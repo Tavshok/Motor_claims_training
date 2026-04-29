@@ -3,6 +3,9 @@ import sys
 import json
 from pathlib import Path
 import tempfile
+import pandas as pd
+from io import BytesIO
+import time
 
 # Add project root to path so we can import our modules
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -18,154 +21,230 @@ from src.cost.cost_breakdown import (
 )
 from src.fusion.evidence_fusion import fuse_claim_data
 
+# ----- Page config -----
 st.set_page_config(page_title="Motor Claims Intelligence", page_icon="📄", layout="wide")
+st.title("🚗 KINGA Motor Claims Forensics – Batch Processing")
+st.caption("Upload multiple PDF claim documents to process them in one go.")
 
-# ---- Custom styles ----
-st.markdown("""
-    <style>
-    .reportview-container .main .block-container { max-width: 1400px; }
-    .stMetric { text-align: center; }
-    .stWarning { font-size: 0.95rem; }
-    </style>
-""", unsafe_allow_html=True)
+# ----- Sidebar: download options -----
+with st.sidebar:
+    st.header("📦 Output Options")
+    export_format = st.radio("Download format", ["Parquet", "JSONL", "JSON (single file)"])
+    st.markdown("---")
+    st.info("All costs are normalised to USD. Currencies handled: ZAR, USD, BWP, EUR, GBP, ZIG, etc.")
 
-st.title("🚗 KINGA Motor Claims Forensics")
-st.caption("Drop a claim PDF to see structured data, component damage, cost breakdown, and fraud signals.")
+# ----- Main area: file uploader -----
+uploaded_files = st.file_uploader(
+    "Choose PDF files",
+    type=["pdf"],
+    accept_multiple_files=True,
+    help="Select one or more claim PDFs"
+)
 
-uploaded_file = st.file_uploader("Upload a claim PDF", type=["pdf"])
+if uploaded_files:
+    st.write(f"**{len(uploaded_files)} file(s) selected**")
 
-if uploaded_file is not None:
-    # Save uploaded file to a temporary location
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
-        tmp.write(uploaded_file.read())
-        pdf_path = Path(tmp.name)
+    if st.button("⚡ Process Batch", type="primary"):
+        results = []
+        progress_bar = st.progress(0, text="Starting...")
+        status_text = st.empty()
 
-    try:
-        with st.spinner("🔍 Extracting text and running forensics..."):
-            # ---- Text & OCR ----
-            text, raw_conf = extract_pdf_content(pdf_path)
-            conf = raw_conf / 100.0 if raw_conf > 1 else raw_conf
+        # Temporary directory to save PDFs
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            for idx, uploaded_file in enumerate(uploaded_files):
+                status_text.text(f"Processing {idx+1}/{len(uploaded_files)}: {uploaded_file.name}")
+                
+                # Save PDF to temp folder
+                pdf_path = tmp_path / uploaded_file.name
+                with open(pdf_path, "wb") as f:
+                    f.write(uploaded_file.read())
 
-            if not text.strip():
-                st.error("No text could be extracted from this PDF. It may be a scanned image without OCR support, or completely empty.")
-                st.stop()
+                # Reset file pointer for potential re-read (unlikely but safe)
+                uploaded_file.seek(0)
 
-            # ---- Core extractions ----
-            extracted = hybrid_extraction(text)
-            vehicle = extract_vehicle_details(text)
-            components = match_damage_description(text)
-            cost_items = extract_cost_items(text, components)
-            fraud = calculate_fraud_risk(extracted, uploaded_file.name)
+                try:
+                    # Extract text
+                    text, raw_conf = extract_pdf_content(pdf_path)
+                    conf = raw_conf / 100.0 if raw_conf > 1 else raw_conf
 
-            # Build enriched claim object (without images, since this is a quick UI)
-            enriched = fuse_claim_data(
-                file_name=uploaded_file.name,
-                text=text,
-                extracted_fields=extracted,
-                vehicle=vehicle,
-                components=components,
-                cost_items=cost_items,
-                images=[],   # no images in this lightweight UI
-                fraud=fraud
-            )
-            enriched["ocr_confidence"] = round(conf, 3)
+                    if not text.strip():
+                        st.warning(f"⚠️ No text extracted from {uploaded_file.name}")
+                        # Still record a placeholder maybe?
+                        results.append({
+                            "file_name": uploaded_file.name,
+                            "ocr_confidence": 0.0,
+                            "error": "No text extracted"
+                        })
+                        continue
 
-            # ---- Display results ----
-            st.success(f"✅ Processed successfully (OCR confidence: {conf:.0%})")
+                    # Core extractions
+                    extracted = hybrid_extraction(text)
+                    vehicle = extract_vehicle_details(text)
+                    components = match_damage_description(text)
+                    cost_items = extract_cost_items(text, components)
+                    fraud = calculate_fraud_risk(extracted, uploaded_file.name)
 
-            tab1, tab2, tab3, tab4 = st.tabs([
-                "📋 Summary", "🔧 Components", "💰 Cost Breakdown", "🕵️ Fraud Signals"
-            ])
+                    # Fusion (without images to keep speed)
+                    enriched = fuse_claim_data(
+                        file_name=uploaded_file.name,
+                        text=text,
+                        extracted_fields=extracted,
+                        vehicle=vehicle,
+                        components=components,
+                        cost_items=cost_items,
+                        images=[],
+                        fraud=fraud
+                    )
+                    enriched["ocr_confidence"] = round(conf, 3)
+                    enriched["error"] = None
 
-            with tab1:
-                col1, col2, col3 = st.columns(3)
-                with col1:
-                    st.metric("Claim Number", enriched.get("claim_number") or "N/A")
-                with col2:
-                    st.metric("Policy Number", enriched.get("policy_number") or "N/A")
-                with col3:
-                    st.metric("Accident Date", enriched.get("accident_date") or "N/A")
+                    results.append(enriched)
 
-                col1, col2, col3 = st.columns(3)
-                with col1:
-                    st.metric("Vehicle Make", enriched["vehicle"].get("make") or "N/A")
-                with col2:
-                    st.metric("Vehicle Model", enriched["vehicle"].get("model") or "N/A")
-                with col3:
-                    st.metric("Year", enriched["vehicle"].get("year") or "N/A")
+                except Exception as e:
+                    st.error(f"❌ Failed on {uploaded_file.name}: {e}")
+                    results.append({
+                        "file_name": uploaded_file.name,
+                        "ocr_confidence": 0.0,
+                        "error": str(e)
+                    })
 
-                st.metric("Registration", enriched["vehicle"].get("registration") or "N/A")
+                # Update progress bar
+                progress_bar.progress((idx + 1) / len(uploaded_files),
+                                     text=f"Completed {idx+1}/{len(uploaded_files)}")
 
-            with tab2:
-                if enriched["damage_components"]:
-                    st.write(f"**{len(enriched['damage_components'])} component(s) found**")
-                    comp_df = []
-                    for c in enriched["damage_components"]:
-                        comp_df.append({
+        status_text.text("✅ Batch processing complete!")
+
+        # ----- Display summary table -----
+        if results:
+            # Flatten key info for table
+            summary_rows = []
+            for r in results:
+                if r.get("error"):
+                    summary_rows.append({
+                        "File": r["file_name"],
+                        "Claim #": "N/A",
+                        "Vehicle": "N/A",
+                        "Components": "N/A",
+                        "Cost Items": "N/A",
+                        "Fraud Score": "N/A",
+                        "OCR Conf.": f"{r['ocr_confidence']:.0%}",
+                        "Error": r["error"]
+                    })
+                else:
+                    summary_rows.append({
+                        "File": r["file_name"],
+                        "Claim #": r.get("claim_number", "N/A"),
+                        "Vehicle": f"{r['vehicle'].get('make','')} {r['vehicle'].get('model','')} ({r['vehicle'].get('year','')})".strip(),
+                        "Components": len(r["damage_components"]),
+                        "Cost Items": len(r["cost_breakdown"]),
+                        "Fraud Score": r["fraud"]["risk_score"],
+                        "OCR Conf.": f"{r['ocr_confidence']:.0%}",
+                        "Error": ""
+                    })
+            df_summary = pd.DataFrame(summary_rows)
+            st.subheader("📊 Batch Results Overview")
+            st.dataframe(df_summary, use_container_width=True)
+
+            # ----- Expandable detail for each claim -----
+            st.subheader("🔍 Inspect Individual Claims")
+            for i, r in enumerate(results):
+                if r.get("error"):
+                    st.warning(f"**{r['file_name']}** – Error: {r['error']}")
+                    continue
+                with st.expander(f"{r['file_name']}  (Fraud risk: {r['fraud']['risk_score']}/100)"):
+                    col1, col2, col3 = st.columns(3)
+                    with col1:
+                        st.metric("Claim #", r.get("claim_number", "N/A"))
+                    with col2:
+                        st.metric("Policy #", r.get("policy_number", "N/A"))
+                    with col3:
+                        st.metric("Accident Date", r.get("accident_date", "N/A"))
+                    
+                    st.write("**Vehicle**")
+                    st.json(r["vehicle"])
+
+                    st.write(f"**Components ({len(r['damage_components'])})**")
+                    if r["damage_components"]:
+                        comp_df = pd.DataFrame([{
                             "Component": c["canonical_name"],
                             "Category": c["category"],
-                            "Confidence (text)": f"{c['text_confidence']:.0%}",
-                            "Repair Estimate (ZAR)": (
-                                f"Replace: R{c['repair_estimates'].get('replace', (0,0))[0]} – R{c['repair_estimates'].get('replace', (0,0))[1]}"
-                                if c.get("repair_estimates") else "N/A"
-                            )
-                        })
-                    st.dataframe(comp_df, use_container_width=True)
-                else:
-                    st.info("No vehicle components detected in the text.")
-
-            with tab3:
-                if enriched["cost_breakdown"]:
-                    cost_df = []
-                    for item in enriched["cost_breakdown"]:
-                        cost_df.append({
-                            "Description": item["description"],
-                            "Original Amount": f"{item['original_amount']} {item['original_currency']}",
-                            "Amount (USD)": f"${item['amount_usd']:,.2f}",
-                            "Component": item["component_name"] or "Unmapped",
-                            "Confidence": f"{item['match_confidence']:.0%}"
-                        })
-                    st.dataframe(cost_df, use_container_width=True)
-
-                    # Show anomalies
-                    anomalies = flag_anomalies(cost_items, components)
-                    if anomalies:
-                        st.subheader("⚠️ Cost Anomalies")
-                        for a in anomalies:
-                            st.warning(a)
-                else:
-                    st.info("No cost line items could be parsed from the text.")
-
-            with tab4:
-                col1, col2 = st.columns(2)
-                with col1:
-                    st.metric("Fraud Risk Score", f"{enriched['fraud']['risk_score']}/100")
-                with col2:
-                    if enriched['fraud']['flags']:
-                        st.error("🚩 Fraud Flags Detected:")
-                        for flag in enriched['fraud']['flags']:
-                            st.write(f"- {flag}")
+                            "Confidence": f"{c['text_confidence']:.0%}"
+                        } for c in r["damage_components"]])
+                        st.dataframe(comp_df, use_container_width=True)
                     else:
-                        st.success("No fraud flags raised.")
+                        st.caption("No components detected.")
 
-            # ---- Raw text expander ----
-            with st.expander("📝 View extracted raw text (first 2000 chars)"):
-                st.text(text[:2000])
+                    st.write(f"**Cost Breakdown ({len(r['cost_breakdown'])})**")
+                    if r["cost_breakdown"]:
+                        cost_df = pd.DataFrame([{
+                            "Description": c["description"],
+                            "Original": f"{c['original_amount']} {c['original_currency']}",
+                            "USD": f"${c['amount_usd']:,.2f}",
+                            "Component": c["component_name"] or "Unmapped",
+                            "Confidence": f"{c['match_confidence']:.0%}"
+                        } for c in r["cost_breakdown"]])
+                        st.dataframe(cost_df, use_container_width=True)
+                    else:
+                        st.caption("No cost line items found.")
 
-            # ---- Download button ----
-            st.download_button(
-                label="💾 Download enriched claim (JSON)",
-                data=json.dumps(enriched, indent=2, ensure_ascii=False),
-                file_name=f"{uploaded_file.name}_enriched.json",
-                mime="application/json"
-            )
+                    st.write("**Fraud Flags**")
+                    if r["fraud"]["flags"]:
+                        for flag in r["fraud"]["flags"]:
+                            st.warning(flag)
+                    else:
+                        st.success("No flags raised.")
 
-    except Exception as e:
-        st.error(f"❌ Processing failed: {str(e)}")
-        st.exception(e)
-    finally:
-        # Clean up temporary file
-        try:
-            pdf_path.unlink()
-        except:
-            pass
+            # ----- Download section -----
+            st.subheader("💾 Download Processed Data")
+            # Prepare full dataset
+            all_data = [r for r in results if not r.get("error")]
+            if all_data:
+                if export_format == "Parquet":
+                    # Need to flatten the enriched data into a DataFrame
+                    flat_rows = []
+                    for claim in all_data:
+                        base = {
+                            "file_name": claim["file_name"],
+                            "claim_number": claim.get("claim_number"),
+                            "policy_number": claim.get("policy_number"),
+                            "accident_date": claim.get("accident_date"),
+                            "vehicle_make": claim["vehicle"].get("make"),
+                            "vehicle_model": claim["vehicle"].get("model"),
+                            "vehicle_year": claim["vehicle"].get("year"),
+                            "vehicle_registration": claim["vehicle"].get("registration"),
+                            "fraud_risk_score": claim["fraud"]["risk_score"],
+                            "fraud_flags": ",".join(claim["fraud"]["flags"]),
+                            "ocr_confidence": claim["ocr_confidence"],
+                            "num_components": len(claim["damage_components"]),
+                            "num_cost_items": len(claim["cost_breakdown"]),
+                            "components_list": json.dumps([c["canonical_name"] for c in claim["damage_components"]]),
+                            "cost_total_usd": sum(c["amount_usd"] for c in claim["cost_breakdown"]),
+                        }
+                        flat_rows.append(base)
+                    df_export = pd.DataFrame(flat_rows)
+
+                    buffer = BytesIO()
+                    df_export.to_parquet(buffer, index=False)
+                    buffer.seek(0)
+                    st.download_button(
+                        label="📥 Download Parquet",
+                        data=buffer,
+                        file_name="batch_claims.parquet",
+                        mime="application/octet-stream"
+                    )
+                elif export_format == "JSONL":
+                    jsonl = "\n".join([json.dumps(r, ensure_ascii=False) for r in all_data])
+                    st.download_button(
+                        label="📥 Download JSONL",
+                        data=jsonl,
+                        file_name="batch_claims.jsonl",
+                        mime="application/jsonl"
+                    )
+                else:  # JSON single file
+                    st.download_button(
+                        label="📥 Download JSON",
+                        data=json.dumps(all_data, indent=2, ensure_ascii=False),
+                        file_name="batch_claims.json",
+                        mime="application/json"
+                    )
