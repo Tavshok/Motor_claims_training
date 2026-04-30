@@ -7,6 +7,7 @@ import pandas as pd
 from io import BytesIO
 from PIL import Image, ImageDraw
 import os
+from datetime import datetime
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
@@ -25,34 +26,60 @@ from src.imaging.image_extractor import extract_images_from_pdf
 # ----- Page config -----
 st.set_page_config(page_title="Motor Claims Forensics", page_icon="📄", layout="wide")
 st.title("🚗 KINGA Motor Claims Forensics – Batch & Review")
-st.caption("Upload claim PDFs. Results are kept until you clear them.")
+st.caption("Upload claim PDFs in batches. Each batch is saved in memory for this session.")
 
 # ----- Session state -----
-if 'results' not in st.session_state:
-    st.session_state.results = None
+if 'batches' not in st.session_state:
+    st.session_state.batches = {}       # batch_id -> {results, timestamp, count}
+if 'batch_counter' not in st.session_state:
+    st.session_state.batch_counter = 0
+if 'selected_batch_id' not in st.session_state:
+    st.session_state.selected_batch_id = None
+
+# ----- Helper: save and select new batch -----
+def save_batch(results):
+    st.session_state.batch_counter += 1
+    batch_id = f"Batch_{st.session_state.batch_counter}"
+    st.session_state.batches[batch_id] = {
+        "results": results,
+        "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M"),
+        "count": len([r for r in results if not r.get("error")])
+    }
+    st.session_state.selected_batch_id = batch_id
 
 # ----- Sidebar -----
 with st.sidebar:
+    st.header("📚 Batch History")
+    if st.session_state.batches:
+        # Show list of batches
+        for bid, bdata in st.session_state.batches.items():
+            btn_label = f"{bid} ({bdata['count']} claims) – {bdata['timestamp']}"
+            if st.button(btn_label, key=f"btn_{bid}"):
+                st.session_state.selected_batch_id = bid
+        st.markdown("---")
+        if st.button("🗑️ Clear all batches"):
+            st.session_state.batches = {}
+            st.session_state.batch_counter = 0
+            st.session_state.selected_batch_id = None
+            st.experimental_rerun()
+    else:
+        st.info("No batches processed yet.")
+
+    st.markdown("---")
     st.header("⚙️ Settings")
     run_damage_detection = st.checkbox("Run damage detection (slow)", value=False)
     export_format = st.radio("Download format", ["Parquet", "JSONL", "JSON (single file)"])
-    if st.session_state.results is not None:
-        st.success(f"{len([r for r in st.session_state.results if not r.get('error')])} claims processed")
-        if st.button("🗑️ Clear stored results"):
-            st.session_state.results = None
-            st.experimental_rerun()
-    st.info("All costs normalised to USD.")
 
-# ----- Main uploader -----
+# ----- Main area: upload and process -----
 uploaded_files = st.file_uploader(
-    "Choose PDF files",
+    "Choose PDF files for a new batch",
     type=["pdf"],
     accept_multiple_files=True,
-    help="Select one or more claim PDFs"
+    help="Select claim PDFs"
 )
 
 if uploaded_files:
-    st.write(f"**{len(uploaded_files)} file(s) ready**")
+    st.write(f"**{len(uploaded_files)} file(s) ready for processing**")
     if st.button("⚡ Process Batch", type="primary"):
         results = []
         progress_bar = st.progress(0, text="Starting...")
@@ -98,7 +125,6 @@ if uploaded_files:
 
                         # ---- Extract images ----
                         images = extract_images_from_pdf(pdf_path, Path("./output"))
-                        # Run damage detection if enabled
                         if run_damage_detection and components:
                             from src.imaging.damage_detector import detect_damage_on_image, build_damage_prompts
                             prompts = build_damage_prompts(components)
@@ -134,13 +160,17 @@ if uploaded_files:
 
                 progress_bar.progress((idx+1)/len(uploaded_files), text=f"Done {idx+1}/{len(uploaded_files)}")
 
-        st.session_state.results = results
-        status_text.text("✅ Batch processing complete!")
+        # Save batch
+        save_batch(results)
+        status_text.text("✅ Batch processing complete! Saved to history.")
+        st.success("✅ Batch processing complete! Saved to history.")
 
-# ----- Display stored results -----
-if st.session_state.results:
-    results = st.session_state.results
-    st.subheader("📊 Batch Results Overview")
+# ----- Display selected batch -----
+if st.session_state.selected_batch_id and st.session_state.batches:
+    batch = st.session_state.batches[st.session_state.selected_batch_id]
+    results = batch["results"]
+    st.subheader(f"📊 {st.session_state.selected_batch_id} – {batch['count']} claims processed ({batch['timestamp']})")
+
     summary_rows = []
     for r in results:
         if r.get("error"):
@@ -220,7 +250,6 @@ if st.session_state.results:
                     img_path = img_meta["image_path"]
                     if os.path.exists(img_path):
                         pil_img = Image.open(img_path)
-                        # Draw bounding boxes if detections exist
                         for det in img_meta.get("detections", []):
                             draw = ImageDraw.Draw(pil_img)
                             b = det["bbox"]
@@ -234,8 +263,8 @@ if st.session_state.results:
             with st.expander("📄 Full extracted text"):
                 st.text(r.get("full_text", ""))
 
-    # ---- Permanent download buttons ----
-    st.subheader("💾 Download Processed Data")
+    # Download for this batch
+    st.subheader("💾 Download Selected Batch")
     all_data = [r for r in results if not r.get("error")]
     if all_data:
         if export_format == "Parquet":
@@ -264,9 +293,9 @@ if st.session_state.results:
             buffer = BytesIO()
             df_export.to_parquet(buffer, index=False)
             buffer.seek(0)
-            st.download_button("📥 Download Parquet", buffer, file_name="batch_claims.parquet", mime="application/octet-stream")
+            st.download_button("📥 Download Parquet", buffer, file_name=f"{st.session_state.selected_batch_id}_claims.parquet", mime="application/octet-stream")
         elif export_format == "JSONL":
             jsonl = "\n".join([json.dumps(r, ensure_ascii=False) for r in all_data])
-            st.download_button("📥 Download JSONL", jsonl, file_name="batch_claims.jsonl", mime="application/jsonl")
+            st.download_button("📥 Download JSONL", jsonl, file_name=f"{st.session_state.selected_batch_id}_claims.jsonl", mime="application/jsonl")
         else:
-            st.download_button("📥 Download JSON", json.dumps(all_data, indent=2, ensure_ascii=False), file_name="batch_claims.json", mime="application/json")
+            st.download_button("📥 Download JSON", json.dumps(all_data, indent=2, ensure_ascii=False), file_name=f"{st.session_state.selected_batch_id}_claims.json", mime="application/json")
