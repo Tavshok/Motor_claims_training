@@ -1,12 +1,11 @@
 # src/cost/cost_breakdown.py
 """
 Multi‑quotation, table‑aware cost extraction with abbreviation normalisation.
+Flags implausible costs (> $10,000 or > 3× typical repair range).
 """
 
 import re
 from typing import List, Dict, Any, Optional
-
-# (Keep your component ontology import)
 from src.damage.component_ontology import COMPONENT_ONTOLOGY
 
 # ── Abbreviation normalisation ──
@@ -32,7 +31,7 @@ def normalise_abbreviations(text: str) -> str:
     return text
 
 
-# ── Vehicle extraction (unchanged from your latest fix) ──
+# ── Vehicle extraction ──
 def extract_vehicle_details(text: str) -> Dict[str, Optional[str]]:
     m_make = re.search(r'Make\s*:\s*(.*?)(?:[\n\r.,]|$)', text, re.IGNORECASE)
     m_model = re.search(r'Model\s*:\s*(.*?)(?:[\n\r.,]|$)', text, re.IGNORECASE)
@@ -46,7 +45,7 @@ def extract_vehicle_details(text: str) -> Dict[str, Optional[str]]:
     return {"make": make, "model": model, "year": year}
 
 
-# ── Free‑text cost patterns (unchanged) ──
+# ── Free‑text cost patterns ──
 COST_LINE_PATTERNS = [
     r'(?P<desc>[A-Za-z\s/&-]+?)\s*[-–:]\s*(?P<currency>[Rr$ZzAaUuSsDd]+)\s*(?P<amount>[\d\s,]+\.?\d{0,2})',
     r'(?P<desc>[A-Za-z\s/&-]+?)\s*[:]\s*(?P<currency>[Rr$ZzAaUuSsDd]+)\s*(?P<amount>[\d\s,]+\.?\d{0,2})',
@@ -84,6 +83,23 @@ def _map_component(desc: str) -> Optional[Dict[str, Any]]:
     return None
 
 
+def _check_implausible(item: Dict[str, Any]) -> bool:
+    """
+    Return True if the cost is implausible:
+    - Amount > $10,000 absolute cap
+    - Exceeds 3× the typical replace cost for the mapped component
+    """
+    if item["amount"] > 10000:
+        return True
+    if item.get("component_id"):
+        comp = next((c for c in COMPONENT_ONTOLOGY if c["component_id"] == item["component_id"]), None)
+        if comp:
+            hi_replace = comp.get("repair_cost_estimates", {}).get("replace", (0, 0))[1]
+            if hi_replace > 0 and item["amount"] > hi_replace * 3:
+                return True
+    return False
+
+
 def extract_cost_items_from_text(text: str) -> List[Dict[str, Any]]:
     """Standard regex‑based cost extraction from a text block."""
     items = []
@@ -103,6 +119,7 @@ def extract_cost_items_from_text(text: str) -> List[Dict[str, Any]]:
                 "component_name": comp["component_name"] if comp else None,
                 "match_confidence": comp["match_confidence"] if comp else 0.0
             }
+            item["implausible"] = _check_implausible(item)
             items.append(item)
     return items
 
@@ -123,7 +140,6 @@ def extract_table_cost_items(text: str) -> List[Dict[str, Any]]:
         tokens = line.split()
         nums = []
         for tok in tokens:
-            # Remove commas, check if it's a float
             clean = tok.replace(",", "")
             try:
                 val = float(clean)
@@ -148,16 +164,17 @@ def extract_table_cost_items(text: str) -> List[Dict[str, Any]]:
             comp = _map_component(desc)
             # Create one cost item per numeric value (each represents a quote column)
             for col_idx, amount in enumerate(nums):
-                # Use a generic currency; will be normalised in fusion
-                items.append({
+                item = {
                     "description": desc,
                     "amount": amount,
-                    "currency": "USD",   # placeholder, you can improve by detecting currency symbols earlier
+                    "currency": "USD",   # placeholder; will be normalised in fusion
                     "component_id": comp["component_id"] if comp else None,
                     "component_name": comp["component_name"] if comp else None,
                     "match_confidence": comp["match_confidence"] if comp else 0.0,
-                    "quote_column": col_idx + 1    # 1‑based index of the quote column
-                })
+                    "quote_column": col_idx + 1
+                }
+                item["implausible"] = _check_implausible(item)
+                items.append(item)
     return items
 
 
@@ -207,6 +224,7 @@ def extract_all_quotations(text: str) -> List[Dict[str, Any]]:
     High‑level function: normalise abbreviations, split into sections,
     extract cost items from each section (using regex or table fallback),
     and return a structured list of quotation sections.
+    Each cost item gets an 'implausible' flag.
     """
     # Normalise first
     normalised = normalise_abbreviations(text)
