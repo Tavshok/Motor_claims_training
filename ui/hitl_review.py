@@ -24,6 +24,7 @@ from src.cost.cost_breakdown import (
 from src.fusion.evidence_fusion import fuse_claim_data
 from src.imaging.image_extractor import extract_images_from_pdf
 
+# ----- Page config -----
 st.set_page_config(page_title="Motor Claims Forensics", page_icon="📄", layout="wide")
 st.title("🚗 KINGA Motor Claims Forensics – Batch & Review")
 st.caption("Upload claim PDFs or Word documents in batches. Each batch is saved in memory for this session.")
@@ -65,8 +66,10 @@ with st.sidebar:
 
     st.markdown("---")
     st.header("⚙️ Settings")
-    run_damage_detection = st.checkbox("Run damage detection (slow)", value=False)
-    require_vehicle = st.checkbox("Exclude costs without vehicle info", value=True)
+    run_damage_detection = st.checkbox("Run damage detection (slow)", value=False,
+                                       help="Enables image‑based damage detection. Uses more memory.")
+    require_vehicle = st.checkbox("Exclude costs without vehicle info", value=True,
+                                 help="Keep only cost rows where vehicle make & model are known")
     exclude_implausible = st.checkbox("Exclude implausible costs (flag)", value=True,
                                      help="Remove cost items that are extremely high compared to typical repair ranges")
     export_format = st.radio("Download format", ["Parquet", "JSONL", "JSON (single file)"])
@@ -91,16 +94,17 @@ if uploaded_files:
             for idx, uploaded_file in enumerate(uploaded_files):
                 status_text.text(f"Processing {idx+1}/{len(uploaded_files)}: {uploaded_file.name}")
                 suffix = Path(uploaded_file.name).suffix
-                pdf_path = tmp_path / uploaded_file.name
-                with open(pdf_path, "wb") as f:
+                file_path = tmp_path / uploaded_file.name
+                with open(file_path, "wb") as f:
                     f.write(uploaded_file.read())
                 uploaded_file.seek(0)
 
                 try:
+                    # ---- Text extraction ----
                     if suffix.lower() == ".pdf":
-                        text, raw_conf = extract_pdf_content(pdf_path)
+                        text, raw_conf = extract_pdf_content(file_path)
                     elif suffix.lower() == ".docx":
-                        text, raw_conf = extract_docx_content(pdf_path)
+                        text, raw_conf = extract_docx_content(file_path)
                     else:
                         continue
 
@@ -111,10 +115,10 @@ if uploaded_files:
                     cost_sections = extract_all_quotations(text)
                     fraud = calculate_fraud_risk(extracted, uploaded_file.name)
 
-                    # Flag implausible costs (simple check: > $10,000 per component)
+                    # ---- Flag implausible costs ----
                     for sec in cost_sections:
                         for item in sec["items"]:
-                            item["implausible"] = item.get("amount", 0) > 10000  # hard cap before normalisation
+                            item["implausible"] = item.get("amount", 0) > 10000
                             if item.get("component_id"):
                                 from src.damage.component_ontology import COMPONENT_ONTOLOGY
                                 comp = next((c for c in COMPONENT_ONTOLOGY if c["component_id"] == item["component_id"]), None)
@@ -123,44 +127,40 @@ if uploaded_files:
                                     if hi_replace > 0 and item["amount"] > hi_replace * 3:
                                         item["implausible"] = True
 
-                    if not text.strip():
-                        enriched = fuse_claim_data(
-                            file_name=uploaded_file.name, text=text,
-                            extracted_fields=extracted, vehicle=vehicle,
-                            components=components, cost_sections=cost_sections,
-                            images=[], fraud=fraud
-                        )
-                        enriched["ocr_confidence"] = conf
-                        enriched["error"] = "Very little text extracted"
-                        enriched["full_text"] = text
-                        results.append(enriched)
-                    else:
-                        images = []
-                        if suffix.lower() == ".pdf":
-                            images = extract_images_from_pdf(pdf_path, Path("./output"))
-                        if run_damage_detection and components and images:
-                            from src.imaging.damage_detector import detect_damage_on_image, build_damage_prompts
-                            prompts = build_damage_prompts(components)
-                            for img_meta in images:
-                                try:
-                                    detections = detect_damage_on_image(Path(img_meta["image_path"]), prompts)
-                                    img_meta["detections"] = detections
-                                except:
-                                    img_meta["detections"] = []
-                        else:
-                            for img_meta in images:
-                                img_meta["detections"] = []
+                    # ---- Extract images (PDF only) ----
+                    images = []
+                    if suffix.lower() == ".pdf":
+                        images = extract_images_from_pdf(file_path, Path("./output"))
 
-                        enriched = fuse_claim_data(
-                            file_name=uploaded_file.name, text=text,
-                            extracted_fields=extracted, vehicle=vehicle,
-                            components=components, cost_sections=cost_sections,
-                            images=images, fraud=fraud
-                        )
-                        enriched["ocr_confidence"] = conf
+                    # ---- Damage detection (ONLY if enabled) ----
+                    if run_damage_detection and components and images:
+                        # Lazy import – transformers is only loaded when needed
+                        from src.imaging.damage_detector import detect_damage_on_image, build_damage_prompts
+                        prompts = build_damage_prompts(components)
+                        for img_meta in images:
+                            try:
+                                detections = detect_damage_on_image(Path(img_meta["image_path"]), prompts)
+                                img_meta["detections"] = detections
+                            except Exception as det_err:
+                                img_meta["detections"] = []   # silently ignore detection errors
+                    else:
+                        for img_meta in images:
+                            img_meta["detections"] = []
+
+                    # ---- Build enriched claim ----
+                    enriched = fuse_claim_data(
+                        file_name=uploaded_file.name, text=text,
+                        extracted_fields=extracted, vehicle=vehicle,
+                        components=components, cost_sections=cost_sections,
+                        images=images, fraud=fraud
+                    )
+                    enriched["ocr_confidence"] = conf
+                    if not text.strip():
+                        enriched["error"] = "Very little text extracted"
+                    else:
                         enriched["error"] = None
-                        enriched["full_text"] = text
-                        results.append(enriched)
+                    enriched["full_text"] = text
+                    results.append(enriched)
 
                 except Exception as e:
                     st.error(f"❌ Failed on {uploaded_file.name}: {e}")
@@ -215,7 +215,6 @@ if st.session_state.selected_batch_id and st.session_state.batches:
 
     st.subheader("🔍 Inspect Claims")
     for i, r in enumerate(results):
-        # Always show expander, even for errors
         with st.expander(f"{r['file_name']}  (Fraud risk: {r.get('fraud', {}).get('risk_score', 0)}/100)"):
             if r.get("error"):
                 st.warning(f"Error: {r['error']}")
@@ -287,9 +286,8 @@ if st.session_state.selected_batch_id and st.session_state.batches:
                     st.text(r.get("full_text", ""))
 
     st.subheader("💾 Download Selected Batch")
-    all_data = [r for r in results if not r.get("error")]  # only successful claims for download
+    all_data = [r for r in results if not r.get("error")]
     if all_data:
-        # Apply filters
         filtered = []
         for claim in all_data:
             if require_vehicle:
@@ -298,12 +296,10 @@ if st.session_state.selected_batch_id and st.session_state.batches:
                 if not make or not model:
                     continue
             if exclude_implausible:
-                # Remove implausible items from sections
                 clean_sections = []
                 for sec in claim.get("cost_breakdown_sections", []):
                     clean_items = [item for item in sec["items"] if not item.get("implausible")]
                     clean_sections.append({**sec, "items": clean_items})
-                # Also remove completely empty sections
                 clean_sections = [s for s in clean_sections if s["items"]]
                 claim["cost_breakdown_sections"] = clean_sections
             filtered.append(claim)
