@@ -8,19 +8,24 @@ import numpy as np
 
 logger = logging.getLogger(__name__)
 
-def preprocess_image(img):
+def preprocess_image_heavy(img):
+    """Aggressive preprocessing for very poor scans."""
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    # Apply adaptive thresholding
-    thresh = cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
-                                   cv2.THRESH_BINARY, 11, 2)
-    denoised = cv2.fastNlMeansDenoising(thresh, h=30)
+    # Try Otsu threshold
+    _, otsu = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+    # If Otsu gives very little white area, use adaptive
+    white_pixels = np.sum(otsu == 255)
+    if white_pixels < (gray.size * 0.05):   # less than 5% white
+        otsu = cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+                                     cv2.THRESH_BINARY, 11, 2)
+    denoised = cv2.fastNlMeansDenoising(otsu, h=30)
     return denoised
 
 def extract_pdf_content(pdf_path):
     text = ""
     confidences = []
 
-    # ---- Phase 1: direct text extraction ----
+    # ---- Phase 1: direct text ----
     try:
         reader = PyPDF2.PdfReader(str(pdf_path))
         for page in reader.pages:
@@ -28,43 +33,64 @@ def extract_pdf_content(pdf_path):
             if t:
                 text += t + "\n"
     except Exception as e:
-        logger.warning(f"PyPDF2 error: {e}")
+        logger.warning(f"PyPDF2 failed: {e}")
 
     if len(text.split()) > 50:
         return text, 1.0
 
-    # ---- Phase 2: OCR with multiple attempts ----
-    logger.info(f"OCR fallback for {pdf_path}")
-    try:
-        images = convert_from_path(pdf_path, dpi=300)
-    except Exception as e:
-        logger.error(f"PDF convert error: {e}")
+    # ---- Phase 2: OCR with multiple DPI attempts ----
+    images = None
+    for dpi in [300, 200, 150]:
+        try:
+            images = convert_from_path(pdf_path, dpi=dpi)
+            break
+        except Exception:
+            continue
+
+    if not images:
+        logger.error(f"Cannot convert PDF to images: {pdf_path}")
         return text, 0.0
 
     for img in images:
-        preprocessed = preprocess_image(np.array(img))
-        # Try different PSM modes if first attempt yields little
-        configs = [
-            '--psm 3',   # Fully automatic page segmentation
-            '--psm 6',   # Assume a uniform block of text
-            '--psm 4',   # Assume a single column of text
-        ]
+        img_np = np.array(img)
+        # Try heavy preprocessing first
+        processed = preprocess_image_heavy(img_np)
+        
+        # OCR with multiple configs
         best_text = ""
         best_conf = []
-        for cfg in configs:
-            ocr_data = pytesseract.image_to_data(preprocessed, config=cfg,
-                                                 output_type=pytesseract.Output.DICT)
+        for psm in [3, 6, 4]:
+            data = pytesseract.image_to_data(processed, config=f'--psm {psm}',
+                                             output_type=pytesseract.Output.DICT)
             words = []
             confs = []
-            for i, word in enumerate(ocr_data["text"]):
-                c = int(ocr_data["conf"][i])
-                if word.strip() and c > 0:
+            for i, word in enumerate(data["text"]):
+                c = int(data["conf"][i])
+                if word.strip() and c > 20:   # lower threshold to catch weak text
                     words.append(word)
                     confs.append(c)
             candidate = " ".join(words)
             if len(candidate) > len(best_text):
                 best_text = candidate
                 best_conf = confs
+
+        # If we got very little, try on grayscale directly
+        if len(best_text.split()) < 10:
+            gray = cv2.cvtColor(img_np, cv2.COLOR_BGR2GRAY)
+            data = pytesseract.image_to_data(gray, config='--psm 3',
+                                             output_type=pytesseract.Output.DICT)
+            words = []
+            confs = []
+            for i, word in enumerate(data["text"]):
+                c = int(data["conf"][i])
+                if word.strip() and c > 20:
+                    words.append(word)
+                    confs.append(c)
+            fallback = " ".join(words)
+            if len(fallback) > len(best_text):
+                best_text = fallback
+                best_conf = confs
+
         text += best_text + "\n"
         confidences.extend(best_conf)
 
