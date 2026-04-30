@@ -8,19 +8,31 @@ import re
 from typing import List, Dict, Any, Optional
 from src.damage.component_ontology import COMPONENT_ONTOLOGY
 
-# ── Vehicle extraction patterns ──
-MAKE_MODEL_YEAR_PATTERNS = [
-    # "Toyota Corolla 2019", "BMW 320i 2020", "Ford Ranger 2018"
-    r'(?P<make>[A-Za-z]{3,})\s+(?P<model>[A-Za-z0-9\-]+)\s+(?P<year>(19|20)\d{2})',
-    # "2019 Toyota Corolla", "2020 BMW 320i"
-    r'(?P<year>(19|20)\d{2})\s+(?P<make>[A-Za-z]{3,})\s+(?P<model>[A-Za-z0-9\-]+)',
-    # "Make: Toyota Model: Corolla Year: 2019"
-    r'Make\s*[:\-]\s*(?P<make>[A-Za-z]{3,}).*Model\s*[:\-]\s*(?P<model>[A-Za-z0-9\-]+).*Year\s*[:\-]\s*(?P<year>(19|20)\d{2})',
-]
+# ── Vehicle extraction (new, precise patterns only) ──
 
-# ── Cost line item patterns ──
-# Captures: description part, optional component alias, amount with currency.
-# Currencies: R, $, ZAR, USD, etc.
+def extract_vehicle_details(text: str) -> Dict[str, Optional[str]]:
+    """
+    Extract vehicle make, model, year from text.
+    Returns dict with keys 'make', 'model', 'year' (or None).
+    Uses patterns found in your actual documents: Make : Jeep, Model : Cherokee, Year : 2015
+    """
+    # Non‑greedy match, stop at newline, comma, or end of line
+    m_make = re.search(r'Make\s*:\s*(.*?)(?:[\n\r.,]|$)', text, re.IGNORECASE)
+    m_model = re.search(r'Model\s*:\s*(.*?)(?:[\n\r.,]|$)', text, re.IGNORECASE)
+    m_year = re.search(r'Year\s*:\s*(\d{4})', text, re.IGNORECASE)
+
+    make = m_make.group(1).strip().title() if m_make else None
+    model = m_model.group(1).strip().upper() if m_model else None
+    year = m_year.group(1) if m_year else None
+
+    # If we got at least make and model, it's a valid extraction
+    if make and model:
+        return {"make": make, "model": model, "year": year}
+    # Otherwise return whatever we found (may be partial or None)
+    return {"make": make, "model": model, "year": year}
+
+
+# ── Cost line item patterns (unchanged) ──
 COST_LINE_PATTERNS = [
     # "Front bumper – R1 200" or "Front bumper R1 200"
     r'(?P<desc>[A-Za-z\s/&-]+?)\s*[-–:]\s*(?P<currency>[Rr$ZzAaUuSsDd]+)\s*(?P<amount>[\d\s,]+\.?\d{0,2})',
@@ -32,6 +44,7 @@ COST_LINE_PATTERNS = [
     r'Amount\s*[:\-]?\s*(?P<currency>[Rr$ZzAaUuSsDd]+)\s*(?P<amount>[\d\s,]+\.?\d{0,2})\s*\((?P<desc>[^)]+)\)',
 ]
 
+
 def _clean_amount(amount_str: str) -> float:
     """Remove spaces and commas, parse to float."""
     clean = amount_str.replace(" ", "").replace(",", "")
@@ -39,21 +52,6 @@ def _clean_amount(amount_str: str) -> float:
         return float(clean)
     except:
         return 0.0
-
-def extract_vehicle_details(text: str) -> Dict[str, Optional[str]]:
-    """
-    Extract vehicle make, model, year from text.
-    Returns dict with keys 'make', 'model', 'year' (or None).
-    """
-    for pattern in MAKE_MODEL_YEAR_PATTERNS:
-        match = re.search(pattern, text, re.IGNORECASE)
-        if match:
-            return {
-                "make": match.group("make").strip().title(),
-                "model": match.group("model").strip().upper(),
-                "year": match.group("year").strip(),
-            }
-    return {"make": None, "model": None, "year": None}
 
 
 def extract_cost_items(text: str, components: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
@@ -83,7 +81,7 @@ def extract_cost_items(text: str, components: List[Dict[str, Any]]) -> List[Dict
             for comp in COMPONENT_ONTOLOGY:
                 for alias in comp["aliases"]:
                     if alias in desc_lower:
-                        # Simple confidence based on exactly how the alias appears
+                        # Simple confidence based on how exactly the alias appears
                         conf = 0.9 if alias == desc_lower else 0.7
                         if conf > best_confidence:
                             best_confidence = conf
@@ -115,7 +113,6 @@ def flag_anomalies(cost_items: List[Dict[str, Any]], components: List[Dict[str, 
         if not comp or "repair_cost_estimates" not in comp:
             continue
         ranges = comp["repair_cost_estimates"]
-        # Check replace and repair ranges
         amount = item["amount"]
         anomaly = None
         if "replace" in ranges:
