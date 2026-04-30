@@ -12,12 +12,13 @@ from datetime import datetime
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from src.processing.pdf_parser import extract_pdf_content
+from src.processing.doc_parser import extract_docx_content
 from src.processing.extractor import hybrid_extraction
 from src.features.fraud_signals import calculate_fraud_risk
 from src.damage.component_ontology import match_damage_description
 from src.cost.cost_breakdown import (
     extract_vehicle_details,
-    extract_all_quotations,   # new: returns sections
+    extract_all_quotations,
     flag_anomalies
 )
 from src.fusion.evidence_fusion import fuse_claim_data
@@ -26,7 +27,7 @@ from src.imaging.image_extractor import extract_images_from_pdf
 # ----- Page config -----
 st.set_page_config(page_title="Motor Claims Forensics", page_icon="📄", layout="wide")
 st.title("🚗 KINGA Motor Claims Forensics – Batch & Review")
-st.caption("Upload claim PDFs in batches. Each batch is saved in memory for this session.")
+st.caption("Upload claim PDFs or Word documents in batches. Each batch is saved in memory for this session.")
 
 # ----- Session state -----
 if 'batches' not in st.session_state:
@@ -36,7 +37,6 @@ if 'batch_counter' not in st.session_state:
 if 'selected_batch_id' not in st.session_state:
     st.session_state.selected_batch_id = None
 
-# ----- Helper: save and select new batch -----
 def save_batch(results):
     st.session_state.batch_counter += 1
     batch_id = f"Batch_{st.session_state.batch_counter}"
@@ -71,12 +71,12 @@ with st.sidebar:
                                  help="Keep only cost rows where vehicle make & model are known")
     export_format = st.radio("Download format", ["Parquet", "JSONL", "JSON (single file)"])
 
-# ----- Main area: upload and process -----
+# ----- Main uploader -----
 uploaded_files = st.file_uploader(
-    "Choose PDF files for a new batch",
-    type=["pdf"],
+    "Choose PDF or Word files",
+    type=["pdf", "docx"],
     accept_multiple_files=True,
-    help="Select claim PDFs"
+    help="Select one or more claim documents"
 )
 
 if uploaded_files:
@@ -90,20 +90,28 @@ if uploaded_files:
             tmp_path = Path(tmp_dir)
             for idx, uploaded_file in enumerate(uploaded_files):
                 status_text.text(f"Processing {idx+1}/{len(uploaded_files)}: {uploaded_file.name}")
+                # Save file with original extension
+                suffix = Path(uploaded_file.name).suffix
                 pdf_path = tmp_path / uploaded_file.name
                 with open(pdf_path, "wb") as f:
                     f.write(uploaded_file.read())
                 uploaded_file.seek(0)
 
                 try:
-                    text, raw_conf = extract_pdf_content(pdf_path)
+                    # ---- Extract text based on file type ----
+                    if suffix.lower() == ".pdf":
+                        text, raw_conf = extract_pdf_content(pdf_path)
+                    elif suffix.lower() == ".docx":
+                        text, raw_conf = extract_docx_content(pdf_path)
+                    else:
+                        st.warning(f"Unsupported file type: {suffix}")
+                        continue
+
                     conf = raw_conf / 100.0 if raw_conf > 1 else raw_conf
 
-                    # ---- Always attempt extraction, even if text is short ----
                     extracted = hybrid_extraction(text)
                     vehicle = extract_vehicle_details(text)
                     components = match_damage_description(text)
-                    # Use the new multi‑section cost extraction
                     cost_sections = extract_all_quotations(text)
                     fraud = calculate_fraud_risk(extracted, uploaded_file.name)
 
@@ -120,9 +128,13 @@ if uploaded_files:
                         enriched["full_text"] = text
                         results.append(enriched)
                     else:
-                        # ---- Extract images ----
-                        images = extract_images_from_pdf(pdf_path, Path("./output"))
-                        if run_damage_detection and components:
+                        # Images only for PDFs currently
+                        if suffix.lower() == ".pdf":
+                            images = extract_images_from_pdf(pdf_path, Path("./output"))
+                        else:
+                            images = []
+
+                        if run_damage_detection and components and images:
                             from src.imaging.damage_detector import detect_damage_on_image, build_damage_prompts
                             prompts = build_damage_prompts(components)
                             for img_meta in images:
@@ -157,7 +169,6 @@ if uploaded_files:
 
                 progress_bar.progress((idx+1)/len(uploaded_files), text=f"Done {idx+1}/{len(uploaded_files)}")
 
-        # Save batch
         save_batch(results)
         status_text.text("✅ Batch processing complete! Saved to history.")
         st.success("✅ Batch processing complete! Saved to history.")
@@ -194,7 +205,6 @@ if st.session_state.selected_batch_id and st.session_state.batches:
             })
     st.dataframe(pd.DataFrame(summary_rows), use_container_width=True)
 
-    # Individual claims
     st.subheader("🔍 Inspect Claims")
     for i, r in enumerate(results):
         if r.get("error"):
@@ -208,7 +218,6 @@ if st.session_state.selected_batch_id and st.session_state.batches:
             st.write("**Vehicle**")
             st.json(r["vehicle"])
 
-            # Components
             st.write(f"**Components ({len(r.get('damage_components', []))}**")
             if r["damage_components"]:
                 comp_df = pd.DataFrame([{
@@ -218,7 +227,6 @@ if st.session_state.selected_batch_id and st.session_state.batches:
                 } for c in r["damage_components"]])
                 st.dataframe(comp_df, use_container_width=True)
 
-            # Cost breakdown with sections
             st.write("**Cost Breakdown**")
             sections = r.get("cost_breakdown_sections", [])
             if not sections:
@@ -239,7 +247,6 @@ if st.session_state.selected_batch_id and st.session_state.batches:
                     else:
                         st.caption("No items in this section.")
 
-            # Fraud flags
             st.write("**Fraud Flags**")
             if r["fraud"]["flags"]:
                 for flag in r["fraud"]["flags"]:
@@ -247,7 +254,6 @@ if st.session_state.selected_batch_id and st.session_state.batches:
             else:
                 st.success("No flags.")
 
-            # Images
             imgs = r.get("images", [])
             if imgs:
                 st.write(f"**Page Images ({len(imgs)})**")
@@ -265,24 +271,20 @@ if st.session_state.selected_batch_id and st.session_state.batches:
                             draw.text((rect[0], rect[1]-10), f"{det['label']} ({det['confidence']:.2f})", fill="red")
                         cols[idx_img % 3].image(pil_img, caption=f"Page {img_meta['page_number']}", use_container_width=True)
 
-            # Full raw text
             with st.expander("📄 Full extracted text"):
                 st.text(r.get("full_text", ""))
 
-    # ---- Download for this batch (with vehicle filter) ----
     st.subheader("💾 Download Selected Batch")
     all_data = [r for r in results if not r.get("error")]
     if all_data:
         if export_format == "Parquet":
             flat_rows = []
             for claim in all_data:
-                # Skip if vehicle filter is on and vehicle info missing
                 if require_vehicle:
                     make = claim["vehicle"].get("make")
                     model = claim["vehicle"].get("model")
                     if not make or not model:
-                        continue  # skip this claim's cost rows
-
+                        continue
                 base = {
                     "file_name": claim["file_name"],
                     "claim_number": claim.get("claim_number"),
@@ -309,21 +311,16 @@ if st.session_state.selected_batch_id and st.session_state.batches:
                 buffer.seek(0)
                 st.download_button("📥 Download Parquet", buffer, file_name=f"{st.session_state.selected_batch_id}_claims.parquet", mime="application/octet-stream")
             else:
-                st.warning("No rows after vehicle filter. Please adjust filter or ensure vehicle info is extracted.")
+                st.warning("No rows after vehicle filter.")
         elif export_format == "JSONL":
-            # Apply filter for JSONL as well
-            filtered = all_data
-            if require_vehicle:
-                filtered = [r for r in all_data if r["vehicle"].get("make") and r["vehicle"].get("model")]
+            filtered = [r for r in all_data if not require_vehicle or (r["vehicle"].get("make") and r["vehicle"].get("model"))]
             if filtered:
                 jsonl = "\n".join([json.dumps(r, ensure_ascii=False) for r in filtered])
                 st.download_button("📥 Download JSONL", jsonl, file_name=f"{st.session_state.selected_batch_id}_claims.jsonl", mime="application/jsonl")
             else:
                 st.warning("No data after vehicle filter.")
-        else:  # JSON single file
-            filtered = all_data
-            if require_vehicle:
-                filtered = [r for r in all_data if r["vehicle"].get("make") and r["vehicle"].get("model")]
+        else:
+            filtered = [r for r in all_data if not require_vehicle or (r["vehicle"].get("make") and r["vehicle"].get("model"))]
             if filtered:
                 st.download_button("📥 Download JSON", json.dumps(filtered, indent=2, ensure_ascii=False), file_name=f"{st.session_state.selected_batch_id}_claims.json", mime="application/json")
             else:

@@ -1,12 +1,12 @@
 import argparse
 import logging
 import sys
-import json
 from pathlib import Path
 from tqdm import tqdm
 
 from config.settings import OUTPUT_DIR, LOG_DIR, OCR_CONFIDENCE_THRESHOLD
 from src.processing.pdf_parser import extract_pdf_content
+from src.processing.doc_parser import extract_docx_content
 from src.processing.extractor import hybrid_extraction
 from src.features.fraud_signals import calculate_fraud_risk
 from src.dataset.schema import ClaimRecord, export_parquet, export_jsonl
@@ -21,6 +21,7 @@ from src.cost.cost_breakdown import (
 from src.fusion.evidence_fusion import fuse_claim_data
 from src.graph.claim_graph import build_claim_graph, export_graph
 from src.dataset.flat_dataset import generate_flat_dataset
+import json
 
 Path(LOG_DIR).mkdir(parents=True, exist_ok=True)
 
@@ -48,18 +49,25 @@ def main():
     output_dir.mkdir(parents=True, exist_ok=True)
     (output_dir / "graphs").mkdir(parents=True, exist_ok=True)
 
-    pdf_files = list(input_dir.glob("*.pdf"))
-    if not pdf_files:
-        logger.error("No PDFs found")
+    # Support both PDF and DOCX
+    all_files = list(input_dir.glob("*.pdf")) + list(input_dir.glob("*.docx"))
+    if not all_files:
+        logger.error("No PDF or DOCX files found")
         return
 
     records = []
     all_claims_enriched = []
 
-    for p in tqdm(pdf_files):
+    for p in tqdm(all_files):
         try:
-            # ---- TEXT & OCR ----
-            text, raw_conf = extract_pdf_content(p)
+            # ---- TEXT EXTRACTION (based on file type) ----
+            if p.suffix.lower() == ".pdf":
+                text, raw_conf = extract_pdf_content(p)
+            elif p.suffix.lower() == ".docx":
+                text, raw_conf = extract_docx_content(p)
+            else:
+                continue
+
             conf = raw_conf / 100.0 if raw_conf > 1.0 else raw_conf
             if not text.strip():
                 logger.warning(f"No text extracted from {p.name}, skipping")
@@ -84,12 +92,14 @@ def main():
             else:
                 logger.info(f"No cost line items found in {p.name}")
 
-            # ---- IMAGES ----
-            images = extract_images_from_pdf(p, output_dir)
-            logger.info(f"Extracted {len(images)} images from {p.name}")
+            # ---- IMAGES (PDF only; DOCX images can be added later) ----
+            if p.suffix.lower() == ".pdf":
+                images = extract_images_from_pdf(p, output_dir)
+            else:
+                images = []   # no page images for Word docs for now
 
-            # ---- DAMAGE DETECTION ----
-            if not args.skip_detection and components:
+            # ---- DAMAGE DETECTION (only if images exist) ----
+            if not args.skip_detection and components and images:
                 prompts = build_damage_prompts(components)
                 for img_meta in images:
                     img_path = Path(img_meta["image_path"])
@@ -158,7 +168,7 @@ def main():
             json.dump(all_claims_enriched, f, indent=2, ensure_ascii=False)
         logger.info(f"Enriched claims (fusion) saved to {enriched_path}")
 
-        # ── Flat training dataset ──
+        # Flatten dataset
         flat_df = generate_flat_dataset(all_claims_enriched)
         flat_path = output_dir / "training_dataset.parquet"
         flat_df.to_parquet(flat_path, index=False)
