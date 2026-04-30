@@ -1,7 +1,7 @@
 # src/cost/cost_breakdown.py
 """
 Multi‑quotation, table‑aware cost extraction with abbreviation normalisation.
-Flags implausible costs (> $10,000 or > 3× typical repair range).
+Now captures repair costs from assessor report formats and ignores template noise.
 """
 
 import re
@@ -25,7 +25,6 @@ ABBREVIATIONS = {
 }
 
 def normalise_abbreviations(text: str) -> str:
-    """Expand common abbreviations to full component names."""
     for abbr, full in ABBREVIATIONS.items():
         text = re.sub(r'\b' + re.escape(abbr) + r'\b', full, text, flags=re.IGNORECASE)
     return text
@@ -36,7 +35,6 @@ def extract_vehicle_details(text: str) -> Dict[str, Optional[str]]:
     m_make = re.search(r'Make\s*:\s*(.*?)(?:[\n\r.,]|$)', text, re.IGNORECASE)
     m_model = re.search(r'Model\s*:\s*(.*?)(?:[\n\r.,]|$)', text, re.IGNORECASE)
     m_year = re.search(r'Year\s*:\s*(\d{4})', text, re.IGNORECASE)
-
     make = m_make.group(1).strip().title() if m_make else None
     model = m_model.group(1).strip().upper() if m_model else None
     year = m_year.group(1) if m_year else None
@@ -45,13 +43,33 @@ def extract_vehicle_details(text: str) -> Dict[str, Optional[str]]:
     return {"make": make, "model": model, "year": year}
 
 
-# ── Free‑text cost patterns ──
+# ── Cost line patterns ──
 COST_LINE_PATTERNS = [
+    # "REPAIR COST $1610.00" or "REPAIR COST $ 1610.00"
+    r'(?:REPAIR|REPAIR\s*COST)\s*\$?\s*(?P<amount>[\d,]+\.?\d{0,2})',
+    # "NET COST $1260.00"
+    r'NET\s*COST\s*\$?\s*(?P<amount>[\d,]+\.?\d{0,2})',
+    # "Cost Agreed $927.45"
+    r'Cost\s*Agreed\s*\$?\s*(?P<amount>[\d,]+\.?\d{0,2})',
+    # "Market Value : $7 000.00   REPAIR COST"
+    r'Market\s*Value\s*[:\-]?\s*\$?\s*(?P<amount>[\d,\s]+\.?\d{0,2})',
+    # Standard: "Front bumper – R1 200"
     r'(?P<desc>[A-Za-z\s/&-]+?)\s*[-–:]\s*(?P<currency>[Rr$ZzAaUuSsDd]+)\s*(?P<amount>[\d\s,]+\.?\d{0,2})',
-    r'(?P<desc>[A-Za-z\s/&-]+?)\s*[:]\s*(?P<currency>[Rr$ZzAaUuSsDd]+)\s*(?P<amount>[\d\s,]+\.?\d{0,2})',
+    # "R1 200 for front bumper"
     r'(?P<currency>[Rr$ZzAaUuSsDd]+)\s*(?P<amount>[\d\s,]+\.?\d{0,2})\s*(?:for|of)\s+(?P<desc>[A-Za-z\s/&-]+)',
+    # "Amount: R1200.00 (Front bumper)"
     r'Amount\s*[:\-]?\s*(?P<currency>[Rr$ZzAaUuSsDd]+)\s*(?P<amount>[\d\s,]+\.?\d{0,2})\s*\((?P<desc>[^)]+)\)',
+    # Simple dollar amount: "$ 1610.00" standing alone
+    r'\$\s*(?P<amount>[\d,]+\.?\d{2})',
 ]
+
+# Ignore amounts that are clearly not costs
+EXCLUDED_DESCRIPTIONS = [
+    "rev", "issued", "speedo", "reading", "token", "contact details",
+    "date", "time", "year", "excess", "betterment"
+]
+MIN_COST_AMOUNT = 5.0         # ignore amounts < $5
+MAX_COST_AMOUNT = 100000.0    # ignore amounts > $100,000 (likely not a repair cost)
 
 def _clean_amount(amount_str: str) -> float:
     clean = amount_str.replace(" ", "").replace(",", "")
@@ -62,7 +80,6 @@ def _clean_amount(amount_str: str) -> float:
 
 
 def _map_component(desc: str) -> Optional[Dict[str, Any]]:
-    """Return best component ontology entry for a description."""
     best = None
     best_conf = 0.0
     desc_lower = desc.lower()
@@ -84,11 +101,6 @@ def _map_component(desc: str) -> Optional[Dict[str, Any]]:
 
 
 def _check_implausible(item: Dict[str, Any]) -> bool:
-    """
-    Return True if the cost is implausible:
-    - Amount > $10,000 absolute cap
-    - Exceeds 3× the typical replace cost for the mapped component
-    """
     if item["amount"] > 10000:
         return True
     if item.get("component_id"):
@@ -100,16 +112,46 @@ def _check_implausible(item: Dict[str, Any]) -> bool:
     return False
 
 
+def _is_excluded_description(desc: str) -> bool:
+    """Return True if the description is a known template line."""
+    desc_lower = desc.strip().lower()
+    for excluded in EXCLUDED_DESCRIPTIONS:
+        if excluded in desc_lower:
+            return True
+    # Also exclude if desc is just a date pattern
+    if re.match(r'^\d{2,4}$', desc_lower):
+        return True
+    return False
+
+
 def extract_cost_items_from_text(text: str) -> List[Dict[str, Any]]:
-    """Standard regex‑based cost extraction from a text block."""
     items = []
+    seen_amounts = set()  # avoid duplicates
+
     for pattern in COST_LINE_PATTERNS:
         for match in re.finditer(pattern, text, re.IGNORECASE):
-            desc = match.group("desc").strip().lower()
-            currency = match.group("currency").upper()
             amount = _clean_amount(match.group("amount"))
-            if amount <= 0:
+            # Sanity checks
+            if amount < MIN_COST_AMOUNT or amount > MAX_COST_AMOUNT:
                 continue
+            if amount in seen_amounts:
+                continue
+
+            # Determine description
+            desc = ""
+            currency = "$"
+            try:
+                desc = match.group("desc").strip().lower()
+            except IndexError:
+                desc = "_repair_cost_"  # placeholder for patterns without desc
+            try:
+                currency = match.group("currency").upper()
+            except IndexError:
+                currency = "$"
+
+            if _is_excluded_description(desc):
+                continue
+
             comp = _map_component(desc)
             item = {
                 "description": desc,
@@ -121,22 +163,21 @@ def extract_cost_items_from_text(text: str) -> List[Dict[str, Any]]:
             }
             item["implausible"] = _check_implausible(item)
             items.append(item)
+            seen_amounts.add(amount)
     return items
 
 
 def extract_table_cost_items(text: str) -> List[Dict[str, Any]]:
-    """
-    Fallback parser for lines that contain multiple numeric amounts.
-    Assumes the first number is the amount (currency taken from context or default 'USD').
-    The part description is the leading non‑numeric text.
-    """
+    """Fallback table parser – only for amounts that look like repair costs."""
     items = []
     lines = text.split('\n')
     for line in lines:
         line = line.strip()
         if not line:
             continue
-        # Split by whitespace, gather all numeric tokens
+        # Skip known non‑cost lines
+        if _is_excluded_description(line):
+            continue
         tokens = line.split()
         nums = []
         for tok in tokens:
@@ -147,7 +188,6 @@ def extract_table_cost_items(text: str) -> List[Dict[str, Any]]:
             except ValueError:
                 pass
         if len(nums) >= 1:
-            # The description is everything before the first numeric token
             first_num_idx = None
             for i, tok in enumerate(tokens):
                 clean = tok.replace(",", "")
@@ -159,15 +199,16 @@ def extract_table_cost_items(text: str) -> List[Dict[str, Any]]:
                     continue
             desc_words = tokens[:first_num_idx] if first_num_idx is not None else tokens[:1]
             desc = " ".join(desc_words).strip().lower()
-            if not desc:
+            if not desc or _is_excluded_description(desc):
                 continue
             comp = _map_component(desc)
-            # Create one cost item per numeric value (each represents a quote column)
             for col_idx, amount in enumerate(nums):
+                if amount < MIN_COST_AMOUNT or amount > MAX_COST_AMOUNT:
+                    continue
                 item = {
                     "description": desc,
                     "amount": amount,
-                    "currency": "USD",   # placeholder; will be normalised in fusion
+                    "currency": "USD",
                     "component_id": comp["component_id"] if comp else None,
                     "component_name": comp["component_name"] if comp else None,
                     "match_confidence": comp["match_confidence"] if comp else 0.0,
@@ -184,14 +225,10 @@ SECTION_SEPARATORS = [
     r'QUOTATION\s*\d*',
     r'INVOICE\s*\d*',
     r'PROFORMA\s*\d*',
-    r'Make\s*:\s*\S',   # new claim block
+    r'Make\s*:\s*\S',
 ]
 
 def split_into_quotation_sections(text: str) -> List[Dict[str, str]]:
-    """
-    Split the text into multiple quotation sections.
-    Returns a list of dicts with keys 'title' and 'content'.
-    """
     lines = text.split('\n')
     sections = []
     current_title = "Default Quotation"
@@ -220,25 +257,15 @@ def split_into_quotation_sections(text: str) -> List[Dict[str, str]]:
 
 
 def extract_all_quotations(text: str) -> List[Dict[str, Any]]:
-    """
-    High‑level function: normalise abbreviations, split into sections,
-    extract cost items from each section (using regex or table fallback),
-    and return a structured list of quotation sections.
-    Each cost item gets an 'implausible' flag.
-    """
-    # Normalise first
     normalised = normalise_abbreviations(text)
-
     sections = split_into_quotation_sections(normalised)
     result = []
     for sec in sections:
-        # Try regex first
         regex_items = extract_cost_items_from_text(sec["content"])
-        if len(regex_items) >= 2:   # at least 2 cost lines suggests a proper quote
+        if len(regex_items) >= 2:
             items = regex_items
             method = "regex"
         else:
-            # Fall back to table parser
             table_items = extract_table_cost_items(sec["content"])
             items = table_items
             method = "table"
@@ -249,18 +276,17 @@ def extract_all_quotations(text: str) -> List[Dict[str, Any]]:
         })
     return result
 
-# ---- Legacy wrapper for backward compatibility ----
+
+# ---- Legacy wrapper ----
 def extract_cost_items(text: str, components: List[Dict] = None) -> List[Dict[str, Any]]:
-    """Return flat list of cost items (for existing callers)."""
     all_sections = extract_all_quotations(text)
     flat = []
     for sec in all_sections:
         flat.extend(sec["items"])
     return flat
 
-# ---- Anomaly detection (unchanged, works on flat list) ----
+# ---- Anomaly detection ----
 def flag_anomalies(cost_items: List[Dict[str, Any]], components: List[Dict[str, Any]] = None) -> List[str]:
-    """Return list of anomaly strings."""
     flags = []
     for item in cost_items:
         if not item.get("component_id"):
