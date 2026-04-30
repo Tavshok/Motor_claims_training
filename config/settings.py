@@ -11,7 +11,7 @@ OCR_PSM = 3
 OCR_CONFIDENCE_THRESHOLD = 60
 
 PATTERNS = {
-    "claim_number": r"Claim\s*(?:No|Number|#)[:\s]*([A-Z0-9]+)",
+    "claim_number": r"(?:CLAIM\s*NO|Claim\s*(?:No|Number|#))\s*[:\-]?\s*([A-Z0-9\-/]+)",
     "policy_number": r"Policy\s*(?:No|Number|#)[:\s]*([A-Z0-9\-]+)",
     "vehicle_reg": r"(?:Reg|Registration|Plate)\s*(?:No|Number|#)?[:\s]*([A-Z]{2}\s?\d{2,3}\s?[A-Z]{1,2})",
     "accident_date": r"(?:Accident|Date of loss)[:\s]*(\d{1,2}[/\-.]\d{1,2}[/\-.]\d{2,4})",
