@@ -1,22 +1,39 @@
 # src/cost/cost_breakdown.py
 """
-Extract vehicle details and repair cost line items from claim text.
-Maps items to components using the ontology, flags anomalies.
+Multi‑quotation, table‑aware cost extraction with abbreviation normalisation.
 """
 
 import re
 from typing import List, Dict, Any, Optional
+
+# (Keep your component ontology import)
 from src.damage.component_ontology import COMPONENT_ONTOLOGY
 
-# ── Vehicle extraction (new, precise patterns only) ──
+# ── Abbreviation normalisation ──
+ABBREVIATIONS = {
+    "l/fender": "left fender",
+    "r/fender": "right fender",
+    "l/headlight": "left headlight",
+    "r/headlight": "right headlight",
+    "l/taillight": "left tail light",
+    "r/taillight": "right tail light",
+    "l/mirror": "left side mirror",
+    "r/mirror": "right side mirror",
+    "lh": "left",
+    "rh": "right",
+    "fr": "front",
+    "rr": "rear",
+}
 
+def normalise_abbreviations(text: str) -> str:
+    """Expand common abbreviations to full component names."""
+    for abbr, full in ABBREVIATIONS.items():
+        text = re.sub(r'\b' + re.escape(abbr) + r'\b', full, text, flags=re.IGNORECASE)
+    return text
+
+
+# ── Vehicle extraction (unchanged from your latest fix) ──
 def extract_vehicle_details(text: str) -> Dict[str, Optional[str]]:
-    """
-    Extract vehicle make, model, year from text.
-    Returns dict with keys 'make', 'model', 'year' (or None).
-    Uses patterns found in your actual documents: Make : Jeep, Model : Cherokee, Year : 2015
-    """
-    # Non‑greedy match, stop at newline, comma, or end of line
     m_make = re.search(r'Make\s*:\s*(.*?)(?:[\n\r.,]|$)', text, re.IGNORECASE)
     m_model = re.search(r'Model\s*:\s*(.*?)(?:[\n\r.,]|$)', text, re.IGNORECASE)
     m_year = re.search(r'Year\s*:\s*(\d{4})', text, re.IGNORECASE)
@@ -24,29 +41,20 @@ def extract_vehicle_details(text: str) -> Dict[str, Optional[str]]:
     make = m_make.group(1).strip().title() if m_make else None
     model = m_model.group(1).strip().upper() if m_model else None
     year = m_year.group(1) if m_year else None
-
-    # If we got at least make and model, it's a valid extraction
     if make and model:
         return {"make": make, "model": model, "year": year}
-    # Otherwise return whatever we found (may be partial or None)
     return {"make": make, "model": model, "year": year}
 
 
-# ── Cost line item patterns (unchanged) ──
+# ── Free‑text cost patterns (unchanged) ──
 COST_LINE_PATTERNS = [
-    # "Front bumper – R1 200" or "Front bumper R1 200"
     r'(?P<desc>[A-Za-z\s/&-]+?)\s*[-–:]\s*(?P<currency>[Rr$ZzAaUuSsDd]+)\s*(?P<amount>[\d\s,]+\.?\d{0,2})',
-    # "Replace left headlight: $350"
     r'(?P<desc>[A-Za-z\s/&-]+?)\s*[:]\s*(?P<currency>[Rr$ZzAaUuSsDd]+)\s*(?P<amount>[\d\s,]+\.?\d{0,2})',
-    # "R1 200 for front bumper"
     r'(?P<currency>[Rr$ZzAaUuSsDd]+)\s*(?P<amount>[\d\s,]+\.?\d{0,2})\s*(?:for|of)\s+(?P<desc>[A-Za-z\s/&-]+)',
-    # "Amount: R1200.00 (Front bumper)"
     r'Amount\s*[:\-]?\s*(?P<currency>[Rr$ZzAaUuSsDd]+)\s*(?P<amount>[\d\s,]+\.?\d{0,2})\s*\((?P<desc>[^)]+)\)',
 ]
 
-
 def _clean_amount(amount_str: str) -> float:
-    """Remove spaces and commas, parse to float."""
     clean = amount_str.replace(" ", "").replace(",", "")
     try:
         return float(clean)
@@ -54,17 +62,30 @@ def _clean_amount(amount_str: str) -> float:
         return 0.0
 
 
-def extract_cost_items(text: str, components: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    """
-    Find all cost line items and map them to the nearest component.
-    Returns list of dicts:
-        - description: raw text description
-        - amount: float
-        - currency: original currency symbol
-        - component_id: mapped component (or None)
-        - component_name: canonical name (or None)
-        - match_confidence: 0-1
-    """
+def _map_component(desc: str) -> Optional[Dict[str, Any]]:
+    """Return best component ontology entry for a description."""
+    best = None
+    best_conf = 0.0
+    desc_lower = desc.lower()
+    for comp in COMPONENT_ONTOLOGY:
+        for alias in comp["aliases"]:
+            if alias in desc_lower:
+                conf = 0.9 if alias == desc_lower else 0.7
+                if conf > best_conf:
+                    best_conf = conf
+                    best = comp
+                break
+    if best:
+        return {
+            "component_id": best["component_id"],
+            "component_name": best["canonical"],
+            "match_confidence": best_conf
+        }
+    return None
+
+
+def extract_cost_items_from_text(text: str) -> List[Dict[str, Any]]:
+    """Standard regex‑based cost extraction from a text block."""
     items = []
     for pattern in COST_LINE_PATTERNS:
         for match in re.finditer(pattern, text, re.IGNORECASE):
@@ -73,42 +94,159 @@ def extract_cost_items(text: str, components: List[Dict[str, Any]]) -> List[Dict
             amount = _clean_amount(match.group("amount"))
             if amount <= 0:
                 continue
-
-            # Try to map description to a component ontology entry
-            best_comp = None
-            best_confidence = 0.0
-            desc_lower = desc.lower()
-            for comp in COMPONENT_ONTOLOGY:
-                for alias in comp["aliases"]:
-                    if alias in desc_lower:
-                        # Simple confidence based on how exactly the alias appears
-                        conf = 0.9 if alias == desc_lower else 0.7
-                        if conf > best_confidence:
-                            best_confidence = conf
-                            best_comp = comp
-                        break   # one alias match per component is enough
-
-            items.append({
+            comp = _map_component(desc)
+            item = {
                 "description": desc,
                 "amount": amount,
                 "currency": currency,
-                "component_id": best_comp["component_id"] if best_comp else None,
-                "component_name": best_comp["canonical"] if best_comp else None,
-                "match_confidence": best_confidence,
-            })
+                "component_id": comp["component_id"] if comp else None,
+                "component_name": comp["component_name"] if comp else None,
+                "match_confidence": comp["match_confidence"] if comp else 0.0
+            }
+            items.append(item)
     return items
 
 
-def flag_anomalies(cost_items: List[Dict[str, Any]], components: List[Dict[str, Any]]) -> List[str]:
+def extract_table_cost_items(text: str) -> List[Dict[str, Any]]:
     """
-    Compare extracted costs to expected ranges from the ontology.
-    Returns a list of anomaly descriptions.
+    Fallback parser for lines that contain multiple numeric amounts.
+    Assumes the first number is the amount (currency taken from context or default 'USD').
+    The part description is the leading non‑numeric text.
     """
+    items = []
+    lines = text.split('\n')
+    for line in lines:
+        line = line.strip()
+        if not line:
+            continue
+        # Split by whitespace, gather all numeric tokens
+        tokens = line.split()
+        nums = []
+        for tok in tokens:
+            # Remove commas, check if it's a float
+            clean = tok.replace(",", "")
+            try:
+                val = float(clean)
+                nums.append(val)
+            except ValueError:
+                pass
+        if len(nums) >= 1:
+            # The description is everything before the first numeric token
+            first_num_idx = None
+            for i, tok in enumerate(tokens):
+                clean = tok.replace(",", "")
+                try:
+                    float(clean)
+                    first_num_idx = i
+                    break
+                except ValueError:
+                    continue
+            desc_words = tokens[:first_num_idx] if first_num_idx is not None else tokens[:1]
+            desc = " ".join(desc_words).strip().lower()
+            if not desc:
+                continue
+            comp = _map_component(desc)
+            # Create one cost item per numeric value (each represents a quote column)
+            for col_idx, amount in enumerate(nums):
+                # Use a generic currency; will be normalised in fusion
+                items.append({
+                    "description": desc,
+                    "amount": amount,
+                    "currency": "USD",   # placeholder, you can improve by detecting currency symbols earlier
+                    "component_id": comp["component_id"] if comp else None,
+                    "component_name": comp["component_name"] if comp else None,
+                    "match_confidence": comp["match_confidence"] if comp else 0.0,
+                    "quote_column": col_idx + 1    # 1‑based index of the quote column
+                })
+    return items
+
+
+# ── Quotation section splitting ──
+SECTION_SEPARATORS = [
+    r'REVISED\s*QUOTATION',
+    r'QUOTATION\s*\d*',
+    r'INVOICE\s*\d*',
+    r'PROFORMA\s*\d*',
+    r'Make\s*:\s*\S',   # new claim block
+]
+
+def split_into_quotation_sections(text: str) -> List[Dict[str, str]]:
+    """
+    Split the text into multiple quotation sections.
+    Returns a list of dicts with keys 'title' and 'content'.
+    """
+    lines = text.split('\n')
+    sections = []
+    current_title = "Default Quotation"
+    current_content = []
+    for line in lines:
+        is_sep = False
+        for sep_pattern in SECTION_SEPARATORS:
+            if re.search(sep_pattern, line, re.IGNORECASE):
+                if current_content:
+                    sections.append({
+                        "title": current_title,
+                        "content": "\n".join(current_content)
+                    })
+                current_title = line.strip()
+                current_content = []
+                is_sep = True
+                break
+        if not is_sep:
+            current_content.append(line)
+    if current_content:
+        sections.append({
+            "title": current_title,
+            "content": "\n".join(current_content)
+        })
+    return sections
+
+
+def extract_all_quotations(text: str) -> List[Dict[str, Any]]:
+    """
+    High‑level function: normalise abbreviations, split into sections,
+    extract cost items from each section (using regex or table fallback),
+    and return a structured list of quotation sections.
+    """
+    # Normalise first
+    normalised = normalise_abbreviations(text)
+
+    sections = split_into_quotation_sections(normalised)
+    result = []
+    for sec in sections:
+        # Try regex first
+        regex_items = extract_cost_items_from_text(sec["content"])
+        if len(regex_items) >= 2:   # at least 2 cost lines suggests a proper quote
+            items = regex_items
+            method = "regex"
+        else:
+            # Fall back to table parser
+            table_items = extract_table_cost_items(sec["content"])
+            items = table_items
+            method = "table"
+        result.append({
+            "section_title": sec["title"],
+            "items": items,
+            "extraction_method": method
+        })
+    return result
+
+# ---- Legacy wrapper for backward compatibility ----
+def extract_cost_items(text: str, components: List[Dict] = None) -> List[Dict[str, Any]]:
+    """Return flat list of cost items (for existing callers)."""
+    all_sections = extract_all_quotations(text)
+    flat = []
+    for sec in all_sections:
+        flat.extend(sec["items"])
+    return flat
+
+# ---- Anomaly detection (unchanged, works on flat list) ----
+def flag_anomalies(cost_items: List[Dict[str, Any]], components: List[Dict[str, Any]] = None) -> List[str]:
+    """Return list of anomaly strings."""
     flags = []
     for item in cost_items:
-        if not item["component_id"]:
+        if not item.get("component_id"):
             continue
-        # Find the component in the ontology
         comp = next((c for c in COMPONENT_ONTOLOGY if c["component_id"] == item["component_id"]), None)
         if not comp or "repair_cost_estimates" not in comp:
             continue

@@ -17,7 +17,7 @@ from src.features.fraud_signals import calculate_fraud_risk
 from src.damage.component_ontology import match_damage_description
 from src.cost.cost_breakdown import (
     extract_vehicle_details,
-    extract_cost_items,
+    extract_all_quotations,   # new: returns sections
     flag_anomalies
 )
 from src.fusion.evidence_fusion import fuse_claim_data
@@ -30,7 +30,7 @@ st.caption("Upload claim PDFs in batches. Each batch is saved in memory for this
 
 # ----- Session state -----
 if 'batches' not in st.session_state:
-    st.session_state.batches = {}       # batch_id -> {results, timestamp, count}
+    st.session_state.batches = {}
 if 'batch_counter' not in st.session_state:
     st.session_state.batch_counter = 0
 if 'selected_batch_id' not in st.session_state:
@@ -51,7 +51,6 @@ def save_batch(results):
 with st.sidebar:
     st.header("📚 Batch History")
     if st.session_state.batches:
-        # Show list of batches
         for bid, bdata in st.session_state.batches.items():
             btn_label = f"{bid} ({bdata['count']} claims) – {bdata['timestamp']}"
             if st.button(btn_label, key=f"btn_{bid}"):
@@ -68,6 +67,8 @@ with st.sidebar:
     st.markdown("---")
     st.header("⚙️ Settings")
     run_damage_detection = st.checkbox("Run damage detection (slow)", value=False)
+    require_vehicle = st.checkbox("Exclude costs without vehicle info", value=True,
+                                 help="Keep only cost rows where vehicle make & model are known")
     export_format = st.radio("Download format", ["Parquet", "JSONL", "JSON (single file)"])
 
 # ----- Main area: upload and process -----
@@ -98,18 +99,20 @@ if uploaded_files:
                     text, raw_conf = extract_pdf_content(pdf_path)
                     conf = raw_conf / 100.0 if raw_conf > 1 else raw_conf
 
+                    # ---- Always attempt extraction, even if text is short ----
+                    extracted = hybrid_extraction(text)
+                    vehicle = extract_vehicle_details(text)
+                    components = match_damage_description(text)
+                    # Use the new multi‑section cost extraction
+                    cost_sections = extract_all_quotations(text)
+                    fraud = calculate_fraud_risk(extracted, uploaded_file.name)
+
                     if not text.strip():
-                        snippet = text[:200] if text else "(empty)"
                         st.warning(f"⚠️ Very little text from {uploaded_file.name}")
-                        extracted = hybrid_extraction(text)
-                        vehicle = extract_vehicle_details(text)
-                        components = match_damage_description(text)
-                        cost_items = extract_cost_items(text, components)
-                        fraud = calculate_fraud_risk(extracted, uploaded_file.name)
                         enriched = fuse_claim_data(
                             file_name=uploaded_file.name, text=text,
                             extracted_fields=extracted, vehicle=vehicle,
-                            components=components, cost_items=cost_items,
+                            components=components, cost_sections=cost_sections,
                             images=[], fraud=fraud
                         )
                         enriched["ocr_confidence"] = conf
@@ -117,12 +120,6 @@ if uploaded_files:
                         enriched["full_text"] = text
                         results.append(enriched)
                     else:
-                        extracted = hybrid_extraction(text)
-                        vehicle = extract_vehicle_details(text)
-                        components = match_damage_description(text)
-                        cost_items = extract_cost_items(text, components)
-                        fraud = calculate_fraud_risk(extracted, uploaded_file.name)
-
                         # ---- Extract images ----
                         images = extract_images_from_pdf(pdf_path, Path("./output"))
                         if run_damage_detection and components:
@@ -141,7 +138,7 @@ if uploaded_files:
                         enriched = fuse_claim_data(
                             file_name=uploaded_file.name, text=text,
                             extracted_fields=extracted, vehicle=vehicle,
-                            components=components, cost_items=cost_items,
+                            components=components, cost_sections=cost_sections,
                             images=images, fraud=fraud
                         )
                         enriched["ocr_confidence"] = conf
@@ -189,8 +186,8 @@ if st.session_state.selected_batch_id and st.session_state.batches:
                 "File": r["file_name"],
                 "Claim #": r.get("claim_number", "N/A"),
                 "Vehicle": f"{r['vehicle'].get('make','')} {r['vehicle'].get('model','')} ({r['vehicle'].get('year','')})".strip(),
-                "Components": len(r["damage_components"]),
-                "Cost Items": len(r["cost_breakdown"]),
+                "Components": len(r.get("damage_components", [])),
+                "Cost Items": sum(len(sec.get("items", [])) for sec in r.get("cost_breakdown_sections", [])),
                 "Fraud Score": r["fraud"]["risk_score"],
                 "OCR Conf.": f"{r['ocr_confidence']:.0%}",
                 "Error": ""
@@ -212,7 +209,7 @@ if st.session_state.selected_batch_id and st.session_state.batches:
             st.json(r["vehicle"])
 
             # Components
-            st.write(f"**Components ({len(r['damage_components'])})**")
+            st.write(f"**Components ({len(r.get('damage_components', []))}**")
             if r["damage_components"]:
                 comp_df = pd.DataFrame([{
                     "Component": c["canonical_name"],
@@ -221,17 +218,26 @@ if st.session_state.selected_batch_id and st.session_state.batches:
                 } for c in r["damage_components"]])
                 st.dataframe(comp_df, use_container_width=True)
 
-            # Cost breakdown
-            st.write(f"**Cost Breakdown ({len(r['cost_breakdown'])})**")
-            if r["cost_breakdown"]:
-                cost_df = pd.DataFrame([{
-                    "Description": c["description"],
-                    "Original": f"{c['original_amount']} {c['original_currency']}",
-                    "USD": f"${c['amount_usd']:,.2f}",
-                    "Component": c["component_name"] or "Unmapped",
-                    "Confidence": f"{c['match_confidence']:.0%}"
-                } for c in r["cost_breakdown"]])
-                st.dataframe(cost_df, use_container_width=True)
+            # Cost breakdown with sections
+            st.write("**Cost Breakdown**")
+            sections = r.get("cost_breakdown_sections", [])
+            if not sections:
+                st.caption("No cost line items found.")
+            else:
+                for sec in sections:
+                    st.markdown(f"##### {sec['section_title']}  ({sec.get('extraction_method', '')})")
+                    if sec["items"]:
+                        cost_df = pd.DataFrame([{
+                            "Description": c["description"],
+                            "Original": f"{c['original_amount']} {c['original_currency']}",
+                            "USD": f"${c['amount_usd']:,.2f}",
+                            "Component": c["component_name"] or "Unmapped",
+                            "Confidence": f"{c['match_confidence']:.0%}",
+                            "Quote #": c.get("quote_column", "")
+                        } for c in sec["items"]])
+                        st.dataframe(cost_df, use_container_width=True)
+                    else:
+                        st.caption("No items in this section.")
 
             # Fraud flags
             st.write("**Fraud Flags**")
@@ -263,13 +269,20 @@ if st.session_state.selected_batch_id and st.session_state.batches:
             with st.expander("📄 Full extracted text"):
                 st.text(r.get("full_text", ""))
 
-    # Download for this batch
+    # ---- Download for this batch (with vehicle filter) ----
     st.subheader("💾 Download Selected Batch")
     all_data = [r for r in results if not r.get("error")]
     if all_data:
         if export_format == "Parquet":
             flat_rows = []
             for claim in all_data:
+                # Skip if vehicle filter is on and vehicle info missing
+                if require_vehicle:
+                    make = claim["vehicle"].get("make")
+                    model = claim["vehicle"].get("model")
+                    if not make or not model:
+                        continue  # skip this claim's cost rows
+
                 base = {
                     "file_name": claim["file_name"],
                     "claim_number": claim.get("claim_number"),
@@ -283,19 +296,35 @@ if st.session_state.selected_batch_id and st.session_state.batches:
                     "fraud_flags": ",".join(claim["fraud"]["flags"]),
                     "ocr_confidence": claim["ocr_confidence"],
                     "num_components": len(claim["damage_components"]),
-                    "num_cost_items": len(claim["cost_breakdown"]),
+                    "num_cost_items": sum(len(sec["items"]) for sec in claim.get("cost_breakdown_sections", [])),
                     "components_list": json.dumps([c["canonical_name"] for c in claim["damage_components"]]),
-                    "cost_total_usd": sum(c["amount_usd"] for c in claim["cost_breakdown"]),
+                    "cost_total_usd": sum(c["amount_usd"] for sec in claim.get("cost_breakdown_sections", []) for c in sec["items"]),
                     "full_text": claim.get("full_text", "")
                 }
                 flat_rows.append(base)
-            df_export = pd.DataFrame(flat_rows)
-            buffer = BytesIO()
-            df_export.to_parquet(buffer, index=False)
-            buffer.seek(0)
-            st.download_button("📥 Download Parquet", buffer, file_name=f"{st.session_state.selected_batch_id}_claims.parquet", mime="application/octet-stream")
+            if flat_rows:
+                df_export = pd.DataFrame(flat_rows)
+                buffer = BytesIO()
+                df_export.to_parquet(buffer, index=False)
+                buffer.seek(0)
+                st.download_button("📥 Download Parquet", buffer, file_name=f"{st.session_state.selected_batch_id}_claims.parquet", mime="application/octet-stream")
+            else:
+                st.warning("No rows after vehicle filter. Please adjust filter or ensure vehicle info is extracted.")
         elif export_format == "JSONL":
-            jsonl = "\n".join([json.dumps(r, ensure_ascii=False) for r in all_data])
-            st.download_button("📥 Download JSONL", jsonl, file_name=f"{st.session_state.selected_batch_id}_claims.jsonl", mime="application/jsonl")
-        else:
-            st.download_button("📥 Download JSON", json.dumps(all_data, indent=2, ensure_ascii=False), file_name=f"{st.session_state.selected_batch_id}_claims.json", mime="application/json")
+            # Apply filter for JSONL as well
+            filtered = all_data
+            if require_vehicle:
+                filtered = [r for r in all_data if r["vehicle"].get("make") and r["vehicle"].get("model")]
+            if filtered:
+                jsonl = "\n".join([json.dumps(r, ensure_ascii=False) for r in filtered])
+                st.download_button("📥 Download JSONL", jsonl, file_name=f"{st.session_state.selected_batch_id}_claims.jsonl", mime="application/jsonl")
+            else:
+                st.warning("No data after vehicle filter.")
+        else:  # JSON single file
+            filtered = all_data
+            if require_vehicle:
+                filtered = [r for r in all_data if r["vehicle"].get("make") and r["vehicle"].get("model")]
+            if filtered:
+                st.download_button("📥 Download JSON", json.dumps(filtered, indent=2, ensure_ascii=False), file_name=f"{st.session_state.selected_batch_id}_claims.json", mime="application/json")
+            else:
+                st.warning("No data after vehicle filter.")
