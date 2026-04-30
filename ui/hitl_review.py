@@ -24,7 +24,6 @@ from src.cost.cost_breakdown import (
 from src.fusion.evidence_fusion import fuse_claim_data
 from src.imaging.image_extractor import extract_images_from_pdf
 
-# ----- Page config -----
 st.set_page_config(page_title="Motor Claims Forensics", page_icon="📄", layout="wide")
 st.title("🚗 KINGA Motor Claims Forensics – Batch & Review")
 st.caption("Upload claim PDFs or Word documents in batches. Each batch is saved in memory for this session.")
@@ -67,8 +66,9 @@ with st.sidebar:
     st.markdown("---")
     st.header("⚙️ Settings")
     run_damage_detection = st.checkbox("Run damage detection (slow)", value=False)
-    require_vehicle = st.checkbox("Exclude costs without vehicle info", value=True,
-                                 help="Keep only cost rows where vehicle make & model are known")
+    require_vehicle = st.checkbox("Exclude costs without vehicle info", value=True)
+    exclude_implausible = st.checkbox("Exclude implausible costs (flag)", value=True,
+                                     help="Remove cost items that are extremely high compared to typical repair ranges")
     export_format = st.radio("Download format", ["Parquet", "JSONL", "JSON (single file)"])
 
 # ----- Main uploader -----
@@ -90,7 +90,6 @@ if uploaded_files:
             tmp_path = Path(tmp_dir)
             for idx, uploaded_file in enumerate(uploaded_files):
                 status_text.text(f"Processing {idx+1}/{len(uploaded_files)}: {uploaded_file.name}")
-                # Save file with original extension
                 suffix = Path(uploaded_file.name).suffix
                 pdf_path = tmp_path / uploaded_file.name
                 with open(pdf_path, "wb") as f:
@@ -98,25 +97,33 @@ if uploaded_files:
                 uploaded_file.seek(0)
 
                 try:
-                    # ---- Extract text based on file type ----
                     if suffix.lower() == ".pdf":
                         text, raw_conf = extract_pdf_content(pdf_path)
                     elif suffix.lower() == ".docx":
                         text, raw_conf = extract_docx_content(pdf_path)
                     else:
-                        st.warning(f"Unsupported file type: {suffix}")
                         continue
 
                     conf = raw_conf / 100.0 if raw_conf > 1 else raw_conf
-
                     extracted = hybrid_extraction(text)
                     vehicle = extract_vehicle_details(text)
                     components = match_damage_description(text)
                     cost_sections = extract_all_quotations(text)
                     fraud = calculate_fraud_risk(extracted, uploaded_file.name)
 
+                    # Flag implausible costs (simple check: > $10,000 per component)
+                    for sec in cost_sections:
+                        for item in sec["items"]:
+                            item["implausible"] = item.get("amount", 0) > 10000  # hard cap before normalisation
+                            if item.get("component_id"):
+                                from src.damage.component_ontology import COMPONENT_ONTOLOGY
+                                comp = next((c for c in COMPONENT_ONTOLOGY if c["component_id"] == item["component_id"]), None)
+                                if comp:
+                                    hi_replace = comp.get("repair_cost_estimates", {}).get("replace", (0,0))[1]
+                                    if hi_replace > 0 and item["amount"] > hi_replace * 3:
+                                        item["implausible"] = True
+
                     if not text.strip():
-                        st.warning(f"⚠️ Very little text from {uploaded_file.name}")
                         enriched = fuse_claim_data(
                             file_name=uploaded_file.name, text=text,
                             extracted_fields=extracted, vehicle=vehicle,
@@ -128,12 +135,9 @@ if uploaded_files:
                         enriched["full_text"] = text
                         results.append(enriched)
                     else:
-                        # Images only for PDFs currently
+                        images = []
                         if suffix.lower() == ".pdf":
                             images = extract_images_from_pdf(pdf_path, Path("./output"))
-                        else:
-                            images = []
-
                         if run_damage_detection and components and images:
                             from src.imaging.damage_detector import detect_damage_on_image, build_damage_prompts
                             prompts = build_damage_prompts(components)
@@ -164,7 +168,11 @@ if uploaded_files:
                         "file_name": uploaded_file.name,
                         "ocr_confidence": 0.0,
                         "error": str(e),
-                        "full_text": ""
+                        "full_text": "",
+                        "vehicle": {"make": None, "model": None, "year": None},
+                        "damage_components": [],
+                        "cost_breakdown_sections": [],
+                        "fraud": {"risk_score": 0, "flags": []}
                     })
 
                 progress_bar.progress((idx+1)/len(uploaded_files), text=f"Done {idx+1}/{len(uploaded_files)}")
@@ -207,121 +215,134 @@ if st.session_state.selected_batch_id and st.session_state.batches:
 
     st.subheader("🔍 Inspect Claims")
     for i, r in enumerate(results):
-        if r.get("error"):
-            st.warning(f"**{r['file_name']}** – Error: {r['error']}")
-            continue
-        with st.expander(f"{r['file_name']}  (Fraud risk: {r['fraud']['risk_score']}/100)"):
-            col1, col2, col3 = st.columns(3)
-            with col1: st.metric("Claim #", r.get("claim_number", "N/A"))
-            with col2: st.metric("Policy #", r.get("policy_number", "N/A"))
-            with col3: st.metric("Accident Date", r.get("accident_date", "N/A"))
-            st.write("**Vehicle**")
-            st.json(r["vehicle"])
-
-            st.write(f"**Components ({len(r.get('damage_components', []))}**")
-            if r["damage_components"]:
-                comp_df = pd.DataFrame([{
-                    "Component": c["canonical_name"],
-                    "Category": c["category"],
-                    "Confidence": f"{c['text_confidence']:.0%}"
-                } for c in r["damage_components"]])
-                st.dataframe(comp_df, use_container_width=True)
-
-            st.write("**Cost Breakdown**")
-            sections = r.get("cost_breakdown_sections", [])
-            if not sections:
-                st.caption("No cost line items found.")
+        # Always show expander, even for errors
+        with st.expander(f"{r['file_name']}  (Fraud risk: {r.get('fraud', {}).get('risk_score', 0)}/100)"):
+            if r.get("error"):
+                st.warning(f"Error: {r['error']}")
+                st.text("Raw text (first 1000 chars):")
+                st.code(r.get("full_text", "")[:1000])
             else:
-                for sec in sections:
-                    st.markdown(f"##### {sec['section_title']}  ({sec.get('extraction_method', '')})")
-                    if sec["items"]:
-                        cost_df = pd.DataFrame([{
-                            "Description": c["description"],
-                            "Original": f"{c['original_amount']} {c['original_currency']}",
-                            "USD": f"${c['amount_usd']:,.2f}",
-                            "Component": c["component_name"] or "Unmapped",
-                            "Confidence": f"{c['match_confidence']:.0%}",
-                            "Quote #": c.get("quote_column", "")
-                        } for c in sec["items"]])
-                        st.dataframe(cost_df, use_container_width=True)
-                    else:
-                        st.caption("No items in this section.")
+                col1, col2, col3 = st.columns(3)
+                with col1: st.metric("Claim #", r.get("claim_number", "N/A"))
+                with col2: st.metric("Policy #", r.get("policy_number", "N/A"))
+                with col3: st.metric("Accident Date", r.get("accident_date", "N/A"))
+                st.write("**Vehicle**")
+                st.json(r["vehicle"])
 
-            st.write("**Fraud Flags**")
-            if r["fraud"]["flags"]:
-                for flag in r["fraud"]["flags"]:
-                    st.warning(flag)
-            else:
-                st.success("No flags.")
+                comps = r.get("damage_components", [])
+                st.write(f"**Components ({len(comps)})**")
+                if comps:
+                    comp_df = pd.DataFrame([{
+                        "Component": c["canonical_name"],
+                        "Category": c["category"],
+                        "Confidence": f"{c['text_confidence']:.0%}"
+                    } for c in comps])
+                    st.dataframe(comp_df, use_container_width=True)
 
-            imgs = r.get("images", [])
-            if imgs:
-                st.write(f"**Page Images ({len(imgs)})**")
-                cols = st.columns(min(len(imgs), 3))
-                for idx_img, img_meta in enumerate(imgs):
-                    img_path = img_meta["image_path"]
-                    if os.path.exists(img_path):
-                        pil_img = Image.open(img_path)
-                        for det in img_meta.get("detections", []):
-                            draw = ImageDraw.Draw(pil_img)
-                            b = det["bbox"]
-                            w, h = pil_img.size
-                            rect = [b["x"]*w, b["y"]*h, (b["x"]+b["w"])*w, (b["y"]+b["h"])*h]
-                            draw.rectangle(rect, outline="red", width=3)
-                            draw.text((rect[0], rect[1]-10), f"{det['label']} ({det['confidence']:.2f})", fill="red")
-                        cols[idx_img % 3].image(pil_img, caption=f"Page {img_meta['page_number']}", use_container_width=True)
+                st.write("**Cost Breakdown**")
+                sections = r.get("cost_breakdown_sections", [])
+                if not sections:
+                    st.caption("No cost line items found.")
+                else:
+                    for sec in sections:
+                        st.markdown(f"##### {sec['section_title']} ({sec.get('extraction_method', '')})")
+                        if sec["items"]:
+                            cost_df = pd.DataFrame([{
+                                "Description": c["description"],
+                                "Original": f"{c['original_amount']} {c['original_currency']}",
+                                "USD": f"${c['amount_usd']:,.2f}",
+                                "Component": c["component_name"] or "Unmapped",
+                                "Confidence": f"{c['match_confidence']:.0%}",
+                                "Flag": "⚠️ implausible" if c.get("implausible") else ""
+                            } for c in sec["items"]])
+                            st.dataframe(cost_df, use_container_width=True)
+                        else:
+                            st.caption("No items in this section.")
 
-            with st.expander("📄 Full extracted text"):
-                st.text(r.get("full_text", ""))
+                st.write("**Fraud Flags**")
+                if r["fraud"]["flags"]:
+                    for flag in r["fraud"]["flags"]:
+                        st.warning(flag)
+                else:
+                    st.success("No flags.")
+
+                imgs = r.get("images", [])
+                if imgs:
+                    st.write(f"**Page Images ({len(imgs)})**")
+                    cols = st.columns(min(len(imgs), 3))
+                    for idx_img, img_meta in enumerate(imgs):
+                        img_path = img_meta["image_path"]
+                        if os.path.exists(img_path):
+                            pil_img = Image.open(img_path)
+                            for det in img_meta.get("detections", []):
+                                draw = ImageDraw.Draw(pil_img)
+                                b = det["bbox"]
+                                w, h = pil_img.size
+                                rect = [b["x"]*w, b["y"]*h, (b["x"]+b["w"])*w, (b["y"]+b["h"])*h]
+                                draw.rectangle(rect, outline="red", width=3)
+                                draw.text((rect[0], rect[1]-10), f"{det['label']} ({det['confidence']:.2f})", fill="red")
+                            cols[idx_img % 3].image(pil_img, caption=f"Page {img_meta['page_number']}", use_container_width=True)
+
+                with st.expander("📄 Full extracted text"):
+                    st.text(r.get("full_text", ""))
 
     st.subheader("💾 Download Selected Batch")
-    all_data = [r for r in results if not r.get("error")]
+    all_data = [r for r in results if not r.get("error")]  # only successful claims for download
     if all_data:
-        if export_format == "Parquet":
-            flat_rows = []
-            for claim in all_data:
-                if require_vehicle:
-                    make = claim["vehicle"].get("make")
-                    model = claim["vehicle"].get("model")
-                    if not make or not model:
-                        continue
-                base = {
-                    "file_name": claim["file_name"],
-                    "claim_number": claim.get("claim_number"),
-                    "policy_number": claim.get("policy_number"),
-                    "accident_date": claim.get("accident_date"),
-                    "vehicle_make": claim["vehicle"].get("make"),
-                    "vehicle_model": claim["vehicle"].get("model"),
-                    "vehicle_year": claim["vehicle"].get("year"),
-                    "vehicle_registration": claim["vehicle"].get("registration"),
-                    "fraud_risk_score": claim["fraud"]["risk_score"],
-                    "fraud_flags": ",".join(claim["fraud"]["flags"]),
-                    "ocr_confidence": claim["ocr_confidence"],
-                    "num_components": len(claim["damage_components"]),
-                    "num_cost_items": sum(len(sec["items"]) for sec in claim.get("cost_breakdown_sections", [])),
-                    "components_list": json.dumps([c["canonical_name"] for c in claim["damage_components"]]),
-                    "cost_total_usd": sum(c["amount_usd"] for sec in claim.get("cost_breakdown_sections", []) for c in sec["items"]),
-                    "full_text": claim.get("full_text", "")
-                }
-                flat_rows.append(base)
-            if flat_rows:
-                df_export = pd.DataFrame(flat_rows)
-                buffer = BytesIO()
-                df_export.to_parquet(buffer, index=False)
-                buffer.seek(0)
-                st.download_button("📥 Download Parquet", buffer, file_name=f"{st.session_state.selected_batch_id}_claims.parquet", mime="application/octet-stream")
-            else:
-                st.warning("No rows after vehicle filter.")
-        elif export_format == "JSONL":
-            filtered = [r for r in all_data if not require_vehicle or (r["vehicle"].get("make") and r["vehicle"].get("model"))]
-            if filtered:
+        # Apply filters
+        filtered = []
+        for claim in all_data:
+            if require_vehicle:
+                make = claim["vehicle"].get("make")
+                model = claim["vehicle"].get("model")
+                if not make or not model:
+                    continue
+            if exclude_implausible:
+                # Remove implausible items from sections
+                clean_sections = []
+                for sec in claim.get("cost_breakdown_sections", []):
+                    clean_items = [item for item in sec["items"] if not item.get("implausible")]
+                    clean_sections.append({**sec, "items": clean_items})
+                # Also remove completely empty sections
+                clean_sections = [s for s in clean_sections if s["items"]]
+                claim["cost_breakdown_sections"] = clean_sections
+            filtered.append(claim)
+
+        if not filtered:
+            st.warning("No data after applying filters.")
+        else:
+            if export_format == "Parquet":
+                flat_rows = []
+                for claim in filtered:
+                    base = {
+                        "file_name": claim["file_name"],
+                        "claim_number": claim.get("claim_number"),
+                        "policy_number": claim.get("policy_number"),
+                        "accident_date": claim.get("accident_date"),
+                        "vehicle_make": claim["vehicle"].get("make"),
+                        "vehicle_model": claim["vehicle"].get("model"),
+                        "vehicle_year": claim["vehicle"].get("year"),
+                        "vehicle_registration": claim["vehicle"].get("registration"),
+                        "fraud_risk_score": claim["fraud"]["risk_score"],
+                        "fraud_flags": ",".join(claim["fraud"]["flags"]),
+                        "ocr_confidence": claim["ocr_confidence"],
+                        "num_components": len(claim["damage_components"]),
+                        "num_cost_items": sum(len(sec["items"]) for sec in claim.get("cost_breakdown_sections", [])),
+                        "components_list": json.dumps([c["canonical_name"] for c in claim["damage_components"]]),
+                        "cost_total_usd": sum(c["amount_usd"] for sec in claim.get("cost_breakdown_sections", []) for c in sec["items"]),
+                        "full_text": claim.get("full_text", "")
+                    }
+                    flat_rows.append(base)
+                if flat_rows:
+                    df_export = pd.DataFrame(flat_rows)
+                    buffer = BytesIO()
+                    df_export.to_parquet(buffer, index=False)
+                    buffer.seek(0)
+                    st.download_button("📥 Download Parquet", buffer, file_name=f"{st.session_state.selected_batch_id}_claims.parquet", mime="application/octet-stream")
+                else:
+                    st.warning("No rows after filtering.")
+            elif export_format == "JSONL":
                 jsonl = "\n".join([json.dumps(r, ensure_ascii=False) for r in filtered])
                 st.download_button("📥 Download JSONL", jsonl, file_name=f"{st.session_state.selected_batch_id}_claims.jsonl", mime="application/jsonl")
             else:
-                st.warning("No data after vehicle filter.")
-        else:
-            filtered = [r for r in all_data if not require_vehicle or (r["vehicle"].get("make") and r["vehicle"].get("model"))]
-            if filtered:
                 st.download_button("📥 Download JSON", json.dumps(filtered, indent=2, ensure_ascii=False), file_name=f"{st.session_state.selected_batch_id}_claims.json", mime="application/json")
-            else:
-                st.warning("No data after vehicle filter.")
